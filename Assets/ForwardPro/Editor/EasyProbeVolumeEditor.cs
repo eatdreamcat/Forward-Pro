@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.Rendering;
 using UnityEditorInternal;
+using UnityEngine.SceneManagement;
 
 namespace UnityEngine.Rendering.EasyProbeVolume
 {
@@ -27,6 +28,11 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             internal static readonly GUIContent s_DisplayProbe = new GUIContent("Display Probe");
             internal static readonly GUIContent s_ProbeDrawSize = new GUIContent("Probe Draw Size");
             
+            internal static readonly GUIContent s_SampleDirDensity = new GUIContent("Sample Direction Density");
+            internal static readonly GUIContent s_SampleCount = new GUIContent("Sample Count");
+            internal static readonly GUIContent s_PointLightAttenuationConstant = new GUIContent("Point Light Attenuation Constant");
+            internal static readonly GUIContent s_ProbeDebugType = new GUIContent("DebugDraw");
+            
             internal static readonly Color k_GizmoColorBase = new Color32(137, 222, 144, 255);
             
             internal static readonly Color k_GizmoColorCell = new Color32(50, 255, 255, 255);
@@ -44,6 +50,34 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             };
         }
 
+        public enum SampleDirDensity
+        {
+            _6 = 6,
+            _8 = 8,
+            _14 = 14
+        }
+
+        public enum SampleCount
+        {
+            _64 = 64,
+            _128 = 128,
+            _256 = 256,
+            _512 = 512,
+        }
+
+        public enum ProbeDebug
+        {
+            Position,
+            Attenuation,
+            Visibility,
+            Diffuse
+        }
+
+        private SampleDirDensity m_SampleDirDensity = SampleDirDensity._6;
+        private SampleCount m_SampleCount = SampleCount._64;
+        
+        private static List<EasyProbeLightSource> s_LightSources = new();
+        private static List<Light> s_Lights = new();
         static HierarchicalBox _ShapeBox;
         static HierarchicalBox s_ShapeBox
         {
@@ -68,14 +102,14 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         }
 
 
-        private static HierarchicalSphere _ProbeSphere;
+        private static EasyProbeSphere _ProbeSphere;
 
-        private static HierarchicalSphere s_ProbeSphere
+        private static EasyProbeSphere s_ProbeSphere
         {
             get
             {
                 if (_ProbeSphere == null)
-                    _ProbeSphere = new HierarchicalSphere(Styles.k_GizmoColorProbe);
+                    _ProbeSphere = new EasyProbeSphere();
                 return _ProbeSphere;
             }
         }
@@ -83,14 +117,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         private static float s_ProbeRadius = 0.1f;
         private static bool s_DisplayCell = false;
         private static bool s_DisplayProbe = false;
+        private static ProbeDebug s_DebugDraw = ProbeDebug.Attenuation; 
         
         public static int GetAdjustedMultiple(int a, int b, int max)
         {
-            // 计算最小的整数 n，使得 n * a >= b
             int n = (int)Math.Ceiling((double)b / a);
             int result = n * a;
-        
-            // 如果结果超过了最大值，则调整为小于最大值的最大倍数
+            
             if (result > max)
             {
                 result = (max / a) * a;
@@ -140,6 +173,14 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             EasyProbeVolume.s_ProbeCellSize =
                 GetAdjustedMultiple(EasyProbeVolume.s_ProbeSpacing, EasyProbeVolume.s_ProbeCellSize, EasyProbeVolume.s_MaxProbeCellSize);
             
+            
+            EditorGUILayout.Space();
+
+            m_SampleDirDensity = (SampleDirDensity)EditorGUILayout.EnumPopup(Styles.s_SampleDirDensity, m_SampleDirDensity);
+            m_SampleCount = (SampleCount)EditorGUILayout.EnumPopup(Styles.s_SampleCount, m_SampleCount);
+            EasyProbeVolume.s_PointAttenConstantK =
+                EditorGUILayout.Slider(Styles.s_PointLightAttenuationConstant, EasyProbeVolume.s_PointAttenConstantK,
+                    0.01f, 0.1f);
             EditorGUILayout.Space();
 
             s_DisplayCell = EditorGUILayout.Toggle(Styles.s_DisplayCell, s_DisplayCell);
@@ -147,7 +188,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             s_DisplayProbe = EditorGUILayout.Toggle(Styles.s_DisplayProbe, s_DisplayProbe);
             if (s_DisplayProbe)
             {
-                s_ProbeRadius = EditorGUILayout.Slider(Styles.s_ProbeDrawSize, s_ProbeRadius, 0f, 10f);
+                s_ProbeRadius = EditorGUILayout.Slider(Styles.s_ProbeDrawSize, s_ProbeRadius, 0f, 1f);
+                s_DebugDraw = (ProbeDebug)EditorGUILayout.EnumPopup(Styles.s_ProbeDebugType, s_DebugDraw);
             }
             
             EditorGUILayout.Space();
@@ -165,11 +207,83 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             }
             
             EditorGUILayout.Space();
+
+            if (GUILayout.Button("Check Collider"))
+            {
+                CheckCollider();
+            }
+            
+            EditorGUILayout.Space();
             if (GUILayout.Button("Place Probes"))
             {
                 EasyProbeBaking.PlaceProbes();
             }
+            
+            EditorGUILayout.Space();
+            if (GUILayout.Button("Bake"))
+            {
+                s_LightSources.Clear();
+                s_Lights.Clear();
+                pv.lightRoot.GetComponentsInChildren(s_Lights);
+                foreach (var light in s_Lights)
+                {
+                    if (light.type != LightType.Point)
+                    {
+                        // TODO: currently only support point light
+                        continue;
+                    }
+                    
+                    s_LightSources.Add(new EasyProbeLightSource(
+                        new Bounds(light.transform.position, new Vector3(light.range, light.range, light.range)),
+                        light));
+                }
+                EasyProbeBaking.Bake(s_LightSources, m_SampleDirDensity, (int)m_SampleCount);
+            }
         }
+
+        static bool MeshRendererIntersectVolume(Bounds meshBounds)
+        {
+            foreach (var volume in EasyProbeVolume.s_ProbeVolumes)
+            {
+                if (meshBounds.Intersects(new Bounds(volume.transform.position, volume.volumeSize)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        
+        static void CheckCollider()
+        {
+            var scene = SceneManager.GetActiveScene();
+
+            void SetColliderIfNeeded(GameObject gameObject)
+            {
+                var meshRenderers = gameObject.GetComponentsInChildren<MeshRenderer>();
+                foreach (var meshRenderer in meshRenderers)
+                {
+                    meshRenderer.receiveGI = ReceiveGI.LightProbes;
+                    if (MeshRendererIntersectVolume(meshRenderer.bounds))
+                    {
+                        var meshCollider = meshRenderer.GetComponent<MeshCollider>();
+                        if (meshCollider == null)
+                        {
+                            meshCollider = meshRenderer.gameObject.AddComponent<MeshCollider>();
+                            meshCollider.sharedMesh = meshRenderer.GetComponent<MeshFilter>().sharedMesh;
+                        }
+                    }
+                }
+            }
+
+            var roots = scene.GetRootGameObjects();
+            foreach (var rootGo in roots)
+            {
+                SetColliderIfNeeded(rootGo);
+            }
+            
+        }
+        
         
         [DrawGizmo(GizmoType.InSelectionHierarchy)]
         static void DrawGizmosSelected(EasyProbeVolume probeVolume, GizmoType gizmoType)
@@ -211,10 +325,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     {
                         using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one)))
                         {
-                            // Bounding box.
                             s_ProbeSphere.center = probe.position;
                             s_ProbeSphere.radius = s_ProbeRadius;
-                            s_ProbeSphere.DrawHull(true);
+                            s_ProbeSphere.DrawProbe(probe, probeVolume, s_DebugDraw);
                         }
                     }
                 }

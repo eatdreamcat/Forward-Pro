@@ -1,8 +1,6 @@
-using System;
-using System.Collections;
+
 using System.Collections.Generic;
 using UnityEditor;
-using UnityEngine;
 
 namespace UnityEngine.Rendering.EasyProbeVolume
 {
@@ -10,10 +8,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
     [AddComponentMenu("Rendering/Easy Probe Volume")]
     public class EasyProbeVolume : MonoBehaviour
     {
-        public static int s_ProbeSpacing = 10;
-        public static int s_ProbeCellSize = 20;
-        // L2
-        public static int s_CoefficientCount = 27;
+        public static int s_ProbeSpacing = 2;
+        public static int s_ProbeCellSize = 6;
+        public static float s_PointAttenConstantK = 0.1f;
         
         public static List<EasyProbeVolume> s_ProbeVolumes = new();
         
@@ -88,16 +85,18 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             lightRoot.GetComponentsInChildren(m_Lights);
             foreach (var light in m_Lights)
             {
-                if (light.type != LightType.Point)
-                {
-                    // TODO: currently only support point light
-                    continue;
-                }
+                
+                if (CheckLightSupported(light))
                 
                 ExpandBounds(new Bounds(light.transform.position, new Vector3(light.range, light.range, light.range)));
             }
             
             return bounds;
+        }
+        
+        public static bool CheckLightSupported(Light light)
+        {
+            return light.type == LightType.Point && light.lightmapBakeType != LightmapBakeType.Realtime;
         }
         
     }

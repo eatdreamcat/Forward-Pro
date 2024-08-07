@@ -49,12 +49,12 @@
     <Compile Include="Assets\ForwardPro\Runtime\EasyProbeVolume.cs" />
     <Compile Include="Assets\StarterAssets\TutorialInfo\Scripts\Readme.cs" />
     <Compile Include="Assets\StarterAssets\Mobile\Scripts\VirtualInputs\UIVirtualTouchZone.cs" />
-    <Compile Include="Assets\ForwardPro\Samples\TurnIntoProbe.cs" />
     <Compile Include="Assets\ForwardPro\Runtime\EasyProbe.cs" />
     <Compile Include="Assets\ForwardPro\Runtime\EasyProbeCell.cs" />
     <Compile Include="Assets\StarterAssets\Mobile\Scripts\VirtualInputs\UIVirtualButton.cs" />
     <Compile Include="Assets\StarterAssets\Mobile\Scripts\VirtualInputs\UIVirtualJoystick.cs" />
     <Compile Include="Assets\StarterAssets\Mobile\Scripts\Utilities\MobileDisableAutoSwitchControls.cs" />
+    <Compile Include="Assets\ForwardPro\Runtime\EasyProbeRenderingUtils.cs" />
     <Compile Include="Assets\StarterAssets\ThirdPersonController\Scripts\BasicRigidBodyPush.cs" />
     <Compile Include="Assets\ForwardPro\Samples\Garden\Scripts\Runtime\DynamicLightController.cs" />
     <Compile Include="Assets\StarterAssets\InputSystem\StarterAssetsInputs.cs" />
@@ -69,6 +69,7 @@
     <None Include="Assets\SharedAssets\TextMeshPro\Shaders\TMP_SDF-SSD.shader" />
     <None Include="Assets\SharedAssets\Shaders\HLSL\CustomFunctionNodes.hlsl" />
     <None Include="Assets\SharedAssets\TextMeshPro\Shaders\TMP_SDF-Surface-Mobile.shader" />
+    <None Include="Assets\ForwardPro\Runtime\EasyProbeVolume.hlsl" />
     <None Include="Assets\SharedAssets\Shaders\HLSL\Water.hlsl" />
     <None Include="Assets\SharedAssets\TextMeshPro\Shaders\TMP_SDF-Surface.shader" />
     <None Include="Assets\SharedAssets\TextMeshPro\Sprites\EmojiOne_Attribution.txt" />

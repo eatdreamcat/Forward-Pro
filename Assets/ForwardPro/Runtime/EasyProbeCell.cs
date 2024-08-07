@@ -5,9 +5,10 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 {
     public class EasyProbeCell : IEquatable<EasyProbeCell>
     {
+        public int index;
         public List<int> probeIndices = new();
-        public Vector3Int position;
-        public int size;
+        public Vector3Int position = Vector3Int.zero;
+        public int size = 0;
         public bool Equals(EasyProbeCell other)
         {
             return position == other.position && size == other.size;
@@ -27,5 +28,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 position.x + size / 2,
                 position.y + size / 2,
                 position.z + size / 2);
+
+        public Bounds bounds => new Bounds(position, new Vector3(size, size, size));
     }
 }

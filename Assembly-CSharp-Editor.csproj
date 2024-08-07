@@ -46,9 +46,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\ForwardPro\Editor\SerializedEasyProbeVolume.cs" />
+    <Compile Include="Assets\ForwardPro\Editor\Gizmo\EasyProbeSphere.cs" />
     <Compile Include="Assets\ForwardPro\Editor\EasyProbeVolumeEditor.cs" />
+    <Compile Include="Assets\ForwardPro\Editor\EasyProbeBakingUtils.cs" />
     <Compile Include="Assets\StarterAssets\TutorialInfo\Scripts\Editor\ReadmeEditor.cs" />
     <Compile Include="Assets\ForwardPro\Editor\EasyProbeBaking.cs" />
+    <Compile Include="Assets\ForwardPro\Editor\EasyProbeLightSource.cs" />
+    <None Include="Assets\ForwardPro\Editor\Gizmo\ProbePreview.shader" />
     <Reference Include="UnityEngine">
       <HintPath>C:\D\Unity\2022.3.17f1c1\Editor\Data\Managed\UnityEngine\UnityEngine.dll</HintPath>
     </Reference>
