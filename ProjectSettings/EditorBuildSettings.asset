@@ -15,7 +15,7 @@ EditorBuildSettings:
     path: Assets/Scenes/Oasis/OasisScene.unity
     guid: 9fa2ba603a3424f9bafa4119f837f2bc
   - enabled: 1
-    path: Assets/ForwardPro/Samples/Garden/GardenScene.unity
+    path: Assets/ForwardPro/Samples/Garden/EasyProbeGardenScene.unity
     guid: 81e71078978223e4c8ffbf973484c9c5
   - enabled: 1
     path: Assets/Scenes/Cockpit/CockpitScene.unity

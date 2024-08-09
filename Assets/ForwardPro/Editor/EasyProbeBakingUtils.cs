@@ -30,7 +30,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 case 5:
                     return 0.5f * Mathf.Sqrt(15f * INV_PI);
                 case 6:
-                    return 0.25f * Mathf.Sqrt(5f * INV_PI);
+                    return 0.25f * 3 * Mathf.Sqrt(5f * INV_PI);
                 case 7:
                     return 0.5f * Mathf.Sqrt(15f * INV_PI);
                 case 8:
@@ -79,7 +79,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 case 5:
                     return 0.5f * Mathf.Sqrt(15f * INV_PI) * z * y;
                 case 6:
-                    return 0.25f * Mathf.Sqrt(5f * INV_PI) * (z * z * 3 - 1);
+                    return 0.25f * 3 * Mathf.Sqrt(5f * INV_PI) * z * z /* - 0.25f * Mathf.Sqrt(5f * INV_PI)*/;
                 case 7:
                     return 0.5f * Mathf.Sqrt(15f * INV_PI) * z * x;
                 case 8:
@@ -126,25 +126,25 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return sampleDir;
         }
         
-        public static List<Vector3> s_SamplerDirs = new()
-        {
-            Vector3.down,
-            Vector3.up,
-            Vector3.forward,
-            Vector3.back,
-            Vector3.left,
-            Vector3.right,
-            
-            Vector3.Normalize(Vector3.forward + Vector3.left + Vector3.up),
-            Vector3.Normalize(Vector3.forward + Vector3.right + Vector3.up),
-            Vector3.Normalize(Vector3.back + Vector3.right + Vector3.up),
-            Vector3.Normalize(Vector3.back + Vector3.left + Vector3.up),
-            Vector3.Normalize(Vector3.forward + Vector3.left + Vector3.down),
-            Vector3.Normalize(Vector3.forward + Vector3.right + Vector3.down),
-            Vector3.Normalize(Vector3.back + Vector3.right + Vector3.down),
-            Vector3.Normalize(Vector3.back + Vector3.left + Vector3.down),
-            
-        };
+        // public static List<Vector3> s_SamplerDirs = new()
+        // {
+        //     Vector3.down,
+        //     Vector3.up,
+        //     Vector3.forward,
+        //     Vector3.back,
+        //     Vector3.left,
+        //     Vector3.right,
+        //     
+        //     Vector3.Normalize(Vector3.forward + Vector3.left + Vector3.up),
+        //     Vector3.Normalize(Vector3.forward + Vector3.right + Vector3.up),
+        //     Vector3.Normalize(Vector3.back + Vector3.right + Vector3.up),
+        //     Vector3.Normalize(Vector3.back + Vector3.left + Vector3.up),
+        //     Vector3.Normalize(Vector3.forward + Vector3.left + Vector3.down),
+        //     Vector3.Normalize(Vector3.forward + Vector3.right + Vector3.down),
+        //     Vector3.Normalize(Vector3.back + Vector3.right + Vector3.down),
+        //     Vector3.Normalize(Vector3.back + Vector3.left + Vector3.down),
+        //     
+        // };
 
         static float CalculatePointLightAttenuation(float distanceSqr, float rangeSqr, float k)
         {
@@ -177,7 +177,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         }
         
         
-        public static void BakeProbe(Light light, EasyProbe probe, int dirIndexStart, int dirIndexEnd, int sampleCount)
+        public static void BakeProbe(Light light, EasyProbe probe/*, int dirIndexStart, int dirIndexEnd*/, int sampleCount)
         {
             var dirToLight = light.transform.position - probe.position;
             var lightAtten =
@@ -193,9 +193,10 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             }
             probe.visibilty = Mathf.Max(probe.visibilty, visibilty);
             
-            for (int dirIndex = dirIndexStart; dirIndex < dirIndexEnd; ++dirIndex)
-            {
-                var dir = s_SamplerDirs[dirIndex];
+            // for (int dirIndex = dirIndexStart; dirIndex < dirIndexEnd; ++dirIndex)
+            // {
+                // var dir = s_SamplerDirs[dirIndex];
+                var dir = dirToLight.normalized;
                 for (int sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
                 {
                     var sampleDir = GetCosineWeightedRandomDirection(
@@ -206,8 +207,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                         out var pdf
                     );
                     
-                    var radiance = SampleLight(sampleDir, probe, light) * lightAtten * visibilty;
+                    var radiance = SampleLight(sampleDir, probe, light) * lightAtten * visibilty / pdf / sampleCount;
                         
+                    // probe.coefficients.Count = 27
                     for (int coefficientIndex = 0; coefficientIndex < probe.coefficients.Count; coefficientIndex += 3)
                     {
                         var level = coefficientIndex / 3;
@@ -222,7 +224,11 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                             BasicConstant(level);
                     }
                 }
-            }
+                
+                // Test
+                // one dir from light
+                // break;
+            // }
         }
     }
 }

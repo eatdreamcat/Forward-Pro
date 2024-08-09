@@ -11,8 +11,12 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         public static int s_ProbeSpacing = 2;
         public static int s_ProbeCellSize = 6;
         public static float s_PointAttenConstantK = 0.1f;
+        public static float s_EasyPVSamplingNoise = 0.0f;
+        public static float s_EasyProbeIntensity = 1.0f;
         
         public static List<EasyProbeVolume> s_ProbeVolumes = new();
+        public static List<EasyProbe> s_Probes = new();
+        public static List<EasyProbeCell> s_ProbeCells = new();
         
         private List<Light> m_Lights = new();
         
@@ -88,7 +92,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 
                 if (CheckLightSupported(light))
                 
-                ExpandBounds(new Bounds(light.transform.position, new Vector3(light.range, light.range, light.range)));
+                ExpandBounds(new Bounds(light.transform.position, new Vector3(light.range * 2, light.range * 2, light.range * 2)));
             }
             
             return bounds;

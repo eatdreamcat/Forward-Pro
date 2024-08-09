@@ -719,9 +719,6 @@
     <Reference Include="Unity.InternalAPIEditorBridge.007">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.InternalAPIEditorBridge.007.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary">
-      <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary.dll</HintPath>
-    </Reference>
     <Reference Include="Unity.EditorCoroutines.Editor">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.EditorCoroutines.Editor.dll</HintPath>
     </Reference>
@@ -734,9 +731,6 @@
     <Reference Include="com.unity.cinemachine.editor">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\com.unity.cinemachine.editor.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.RenderPipelines.Universal.Runtime">
-      <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.RenderPipelines.Universal.Runtime.dll</HintPath>
-    </Reference>
     <Reference Include="Unity.Burst.Editor">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.Burst.Editor.dll</HintPath>
     </Reference>
@@ -745,9 +739,6 @@
     </Reference>
     <Reference Include="Unity.Timeline.Editor">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.Timeline.Editor.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.ShaderGraph.Editor">
-      <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.ShaderGraph.Editor.dll</HintPath>
     </Reference>
     <Reference Include="Unity.Tutorials.Core">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.Tutorials.Core.dll</HintPath>
@@ -761,23 +752,11 @@
     <Reference Include="UnityEditor.UI">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\UnityEditor.UI.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.UI">
-      <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\UnityEngine.UI.dll</HintPath>
-    </Reference>
     <Reference Include="Unity.Rider.Editor">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.Rider.Editor.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.RenderPipelines.Core.Runtime">
-      <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.RenderPipelines.Core.Runtime.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.RenderPipelines.Core.Editor">
-      <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.RenderPipelines.Core.Editor.dll</HintPath>
-    </Reference>
     <Reference Include="Unity.Mathematics.Editor">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.Mathematics.Editor.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.RenderPipeline.Universal.ShaderLibrary">
-      <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.RenderPipeline.Universal.ShaderLibrary.dll</HintPath>
     </Reference>
     <Reference Include="Unity.Timeline">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.Timeline.dll</HintPath>
@@ -794,12 +773,6 @@
     <Reference Include="Unity.MemoryProfiler.Editor">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.MemoryProfiler.Editor.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.RenderPipelines.Core.ShaderLibrary">
-      <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.RenderPipelines.Core.ShaderLibrary.dll</HintPath>
-    </Reference>
-    <Reference Include="PPv2URPConverters">
-      <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\PPv2URPConverters.dll</HintPath>
-    </Reference>
     <Reference Include="Unity.Mathematics">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.Mathematics.dll</HintPath>
     </Reference>
@@ -808,9 +781,6 @@
     </Reference>
     <Reference Include="Unity.TextMeshPro">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.TextMeshPro.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.RenderPipelines.Universal.Shaders">
-      <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.RenderPipelines.Universal.Shaders.dll</HintPath>
     </Reference>
     <Reference Include="Unity.Recorder">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.Recorder.dll</HintPath>
@@ -827,9 +797,6 @@
     <Reference Include="Cinemachine">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Cinemachine.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.RenderPipelines.Universal.Editor">
-      <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.RenderPipelines.Universal.Editor.dll</HintPath>
-    </Reference>
     <Reference Include="Unity.Tutorials.Core.Editor">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\Unity.Tutorials.Core.Editor.dll</HintPath>
     </Reference>
@@ -839,9 +806,53 @@
       <Project>{465acb07-718a-6bff-33c4-1879cacb91cb}</Project>
       <Name>Assembly-CSharp</Name>
     </ProjectReference>
+    <ProjectReference Include="Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary.csproj">
+      <Project>{02de94c7-fee7-39b2-3ae1-4e9a46ea6c5a}</Project>
+      <Name>Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary</Name>
+    </ProjectReference>
+    <ProjectReference Include="Unity.RenderPipelines.Universal.Runtime.csproj">
+      <Project>{f1600dde-2455-f47c-4ef5-b977c5cfce94}</Project>
+      <Name>Unity.RenderPipelines.Universal.Runtime</Name>
+    </ProjectReference>
+    <ProjectReference Include="Unity.ShaderGraph.Editor.csproj">
+      <Project>{4503852d-5579-d00d-07be-acab4e34140d}</Project>
+      <Name>Unity.ShaderGraph.Editor</Name>
+    </ProjectReference>
+    <ProjectReference Include="UnityEngine.UI.csproj">
+      <Project>{bf0a7820-a94b-1f5c-8c9c-4bfb4e40e376}</Project>
+      <Name>UnityEngine.UI</Name>
+    </ProjectReference>
+    <ProjectReference Include="Unity.RenderPipelines.Core.Runtime.csproj">
+      <Project>{2282f5a6-6eee-eea0-cb93-efec889fdb3b}</Project>
+      <Name>Unity.RenderPipelines.Core.Runtime</Name>
+    </ProjectReference>
     <ProjectReference Include="Unity.RenderPipelines.Universal.Config.Runtime.csproj">
       <Project>{4457749e-90ec-2944-02f7-08bc3496c1d7}</Project>
       <Name>Unity.RenderPipelines.Universal.Config.Runtime</Name>
+    </ProjectReference>
+    <ProjectReference Include="Unity.RenderPipelines.Core.Editor.csproj">
+      <Project>{0c930df9-bd9c-d272-fd17-8f826f5f1efa}</Project>
+      <Name>Unity.RenderPipelines.Core.Editor</Name>
+    </ProjectReference>
+    <ProjectReference Include="Unity.RenderPipeline.Universal.ShaderLibrary.csproj">
+      <Project>{54f6b10f-0c86-f52a-3efa-1387e6ef47e2}</Project>
+      <Name>Unity.RenderPipeline.Universal.ShaderLibrary</Name>
+    </ProjectReference>
+    <ProjectReference Include="Unity.RenderPipelines.Core.ShaderLibrary.csproj">
+      <Project>{45c0742c-73ce-6bce-de2b-05f5fbe886db}</Project>
+      <Name>Unity.RenderPipelines.Core.ShaderLibrary</Name>
+    </ProjectReference>
+    <ProjectReference Include="PPv2URPConverters.csproj">
+      <Project>{2cfc2f8b-83d8-9d5c-e245-d0178a55589d}</Project>
+      <Name>PPv2URPConverters</Name>
+    </ProjectReference>
+    <ProjectReference Include="Unity.RenderPipelines.Universal.Shaders.csproj">
+      <Project>{8e4e9a48-0b7e-9226-81ea-82d3e099af67}</Project>
+      <Name>Unity.RenderPipelines.Universal.Shaders</Name>
+    </ProjectReference>
+    <ProjectReference Include="Unity.RenderPipelines.Universal.Editor.csproj">
+      <Project>{2040b765-ed0b-29a1-4097-48832e02a031}</Project>
+      <Name>Unity.RenderPipelines.Universal.Editor</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

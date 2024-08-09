@@ -25,6 +25,7 @@ Shader "Hiden/EasyProbeVolume/ProbePreview"
             #pragma shader_feature_local_fragment  _ _Diffuse _Attenuation _Position _Visibility
 
             CBUFFER_START(perMaterial)
+            float4 _EasySHCoefficients[7];
             float _ProbeAtten;
             float _Visiablity;
             float3 _VolumeSize;
@@ -65,7 +66,7 @@ Shader "Hiden/EasyProbeVolume/ProbePreview"
                 #endif
                 
                 half3 normalWS = TransformObjectToWorldNormal(normalize(input.normalOS));
-                return half4(SampleEasySHTest(normalWS), 1.0);
+                return half4(SampleEasySH9(normalWS, _EasySHCoefficients), 1.0);
             }
             
             ENDHLSL

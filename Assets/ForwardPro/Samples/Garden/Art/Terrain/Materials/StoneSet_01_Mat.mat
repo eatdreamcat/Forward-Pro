@@ -21,16 +21,18 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: StoneSet_01_Mat
-  m_Shader: {fileID: -6465566751694194690, guid: 3b215c3e58f4f47418634a57cc5c6c2e, type: 3}
+  m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _NORMALMAP
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap: {}
+  stringTagMap:
+    RenderType: Opaque
   disabledShaderPasses: []
   m_LockedProperties: 
   m_SavedProperties:
@@ -134,12 +136,15 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _Smoothness: 1
+    - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
+    - _Triplanar_Blend: 0
+    - _Triplanar_Tile: 1
+    - _Use_Triplanar: 0
     - _WorkflowMode: 1
     - _ZWrite: 1
     m_Colors:
@@ -150,4 +155,5 @@ Material:
     - _MossColorA: {r: 0.4194255, g: 0.4716981, b: 0.18912424, a: 0}
     - _MossColorB: {r: 0.23584908, g: 0.19592768, b: 0, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
+    - _Triplanar_Scale: {r: 0.3, g: 0.8, b: 0, a: 0}
   m_BuildTextureStacks: []

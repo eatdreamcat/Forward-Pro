@@ -32,6 +32,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             internal static readonly GUIContent s_SampleCount = new GUIContent("Sample Count");
             internal static readonly GUIContent s_PointLightAttenuationConstant = new GUIContent("Point Light Attenuation Constant");
             internal static readonly GUIContent s_ProbeDebugType = new GUIContent("DebugDraw");
+            internal static readonly GUIContent s_ProbeVolumeNoise = new GUIContent("Probe Sampling Noise");
+            internal static readonly GUIContent s_ProbeVolumeIntensity = new GUIContent("Probe Shading Intensity");
             
             internal static readonly Color k_GizmoColorBase = new Color32(137, 222, 144, 255);
             
@@ -50,19 +52,23 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             };
         }
 
-        public enum SampleDirDensity
-        {
-            _6 = 6,
-            _8 = 8,
-            _14 = 14
-        }
+        // public enum SampleDirDensity
+        // {
+        //     _6 = 6,
+        //     _8 = 8,
+        //     _14 = 14
+        // }
 
         public enum SampleCount
         {
+          
+            _32 = 32,
             _64 = 64,
             _128 = 128,
             _256 = 256,
             _512 = 512,
+            _1024 = 1024,
+            _2048 = 2048
         }
 
         public enum ProbeDebug
@@ -73,7 +79,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             Diffuse
         }
 
-        private SampleDirDensity m_SampleDirDensity = SampleDirDensity._6;
+        // private SampleDirDensity m_SampleDirDensity = SampleDirDensity._6;
         private SampleCount m_SampleCount = SampleCount._64;
         
         private static List<EasyProbeLightSource> s_LightSources = new();
@@ -128,7 +134,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             {
                 result = (max / a) * a;
             }
-        
+
+            result += (result % 2);
             return result;
         }
         
@@ -170,13 +177,17 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             EasyProbeVolume.s_ProbeCellSize = EditorGUILayout.IntSlider(Styles.s_ProbeCellSize, 
                 EasyProbeVolume.s_ProbeCellSize, EasyProbeVolume.s_ProbeSpacing,
                 EasyProbeVolume.s_MaxProbeCellSize);
-            EasyProbeVolume.s_ProbeCellSize =
-                GetAdjustedMultiple(EasyProbeVolume.s_ProbeSpacing, EasyProbeVolume.s_ProbeCellSize, EasyProbeVolume.s_MaxProbeCellSize);
-            
+            EasyProbeVolume.s_ProbeCellSize = GetAdjustedMultiple(EasyProbeVolume.s_ProbeSpacing,
+                EasyProbeVolume.s_ProbeCellSize, EasyProbeVolume.s_MaxProbeCellSize);
+            EasyProbeVolume.s_EasyPVSamplingNoise = EditorGUILayout.Slider(Styles.s_ProbeVolumeNoise,
+                EasyProbeVolume.s_EasyPVSamplingNoise, 0.0f, 1.0f);
+            EasyProbeVolume.s_EasyProbeIntensity = EditorGUILayout.Slider(Styles.s_ProbeVolumeIntensity,
+                EasyProbeVolume.s_EasyProbeIntensity,
+                0.0f, 1.0f);
             
             EditorGUILayout.Space();
 
-            m_SampleDirDensity = (SampleDirDensity)EditorGUILayout.EnumPopup(Styles.s_SampleDirDensity, m_SampleDirDensity);
+            // m_SampleDirDensity = (SampleDirDensity)EditorGUILayout.EnumPopup(Styles.s_SampleDirDensity, m_SampleDirDensity);
             m_SampleCount = (SampleCount)EditorGUILayout.EnumPopup(Styles.s_SampleCount, m_SampleCount);
             EasyProbeVolume.s_PointAttenConstantK =
                 EditorGUILayout.Slider(Styles.s_PointLightAttenuationConstant, EasyProbeVolume.s_PointAttenConstantK,
@@ -199,10 +210,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 var bounds = pv.ComputeBounds();
                 pv.transform.position = bounds.center;
                 serialized.volumeSize.vector3Value = 
-                    Vector3.Max(bounds.size 
-                                + new Vector3(EasyProbeVolume.s_ProbeSpacing,
-                                    EasyProbeVolume.s_ProbeSpacing,
-                                    EasyProbeVolume.s_ProbeSpacing), 
+                    Vector3.Max(bounds.size, 
                         Vector3.zero);
             }
             
@@ -237,7 +245,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                         new Bounds(light.transform.position, new Vector3(light.range, light.range, light.range)),
                         light));
                 }
-                EasyProbeBaking.Bake(s_LightSources, m_SampleDirDensity, (int)m_SampleCount);
+                EasyProbeBaking.Bake(s_LightSources/*, m_SampleDirDensity*/, (int)m_SampleCount);
             }
         }
 
@@ -300,16 +308,16 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 // Draw Cell
                 if (s_DisplayCell)
                 {
-                    foreach (var cell in EasyProbeBaking.s_ProbeCells)
+                    foreach (var cell in EasyProbeVolume.s_ProbeCells)
                     {
                         using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one)))
                         {
                             // Bounding box.
                             s_CellBox.center = cell.position;
                             s_CellBox.size = new Vector3(
-                                EasyProbeVolume.s_ProbeCellSize,
-                                EasyProbeVolume.s_ProbeCellSize,
-                                EasyProbeVolume.s_ProbeCellSize
+                                cell.size,
+                                cell.size,
+                                cell.size
                             );
                             s_CellBox.DrawHull(EditMode.editMode == k_EditShape);
                         }
@@ -321,7 +329,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 // Draw Probe
                 if (s_DisplayProbe)
                 {
-                    foreach (var probe in EasyProbeBaking.s_Probes)
+                    foreach (var probe in EasyProbeVolume.s_Probes)
                     {
                         using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one)))
                         {

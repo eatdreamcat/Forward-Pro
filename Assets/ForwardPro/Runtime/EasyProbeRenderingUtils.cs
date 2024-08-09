@@ -8,39 +8,63 @@ namespace UnityEngine.Rendering.EasyProbeVolume
     {
         private const int k_PackedCoefficientCount = 7;
         public static int _EasySHCoefficients = Shader.PropertyToID("_EasySHCoefficients");
+       
+        #if UNITY_EDITOR
 
-        public static Vector4[] s_PackedCoefficients = new Vector4[k_PackedCoefficientCount];
+        public static int _ProbeAtten = Shader.PropertyToID("_ProbeAtten");
+        public static int _Visiablity = Shader.PropertyToID("_Visiablity");
+        public static int _VolumeSize = Shader.PropertyToID("_VolumeSize");
+
+        #endif
         /**
-         *  0 - 2:
-         *  xyz : L1 rgb, w: L0 rgb
-         */
-        private static Vector4[] m_TestCoefficients = new Vector4[9];
+        *  0 - 2:
+        *  xyz : L1 rgb, w: L0 rgb
+        */
+        public static Vector4[] s_PackedCoefficients = new Vector4[k_PackedCoefficientCount];
+        
         public static void PackAndPushCoefficients(Material material, EasyProbe probe, EasyProbeVolume volume)
         {
-            //test
-            for (int i = 0; i < m_TestCoefficients.Length; ++i)
-            {
-                m_TestCoefficients[i] = new Vector4(
-                    probe.coefficients[i * 3],
-                    probe.coefficients[i * 3 + 1],
-                    probe.coefficients[i * 3 + 2]
-                );
-            }
-            material.SetVectorArray("_SHLightingCoefficients", m_TestCoefficients);
-            material.SetFloat("_ProbeAtten", probe.atten);
-            material.SetFloat("_Visiablity", probe.visibilty);
-            material.SetVector("_VolumeSize", volume.volumeSize);
             
-            return;
+            #if UNITY_EDITOR
+            
+            material.SetFloat(_ProbeAtten, probe.atten);
+            material.SetFloat(_Visiablity, probe.visibilty);
+            material.SetVector(_VolumeSize, volume.volumeSize);
+            
+            #endif
+            
+            // L0L1
             for (int i = 0; i < 3; ++i)
             {
+                var L1 = i + 3;
                 s_PackedCoefficients[i] = new Vector4(
-                    probe.coefficients[i * 3 + 3],
-                    probe.coefficients[i * 3 + 4],
-                    probe.coefficients[i * 3 + 5],
-                    probe.coefficients[i]
+                    probe.coefficients[L1], // L1 shAr  shAg  shAg
+                    probe.coefficients[L1 + 3], 
+                    probe.coefficients[L1 + 6], 
+                    probe.coefficients[i] // L0: RGB
                 );
             }
+
+            // L2
+            for (int i = 3; i < k_PackedCoefficientCount - 1; ++i)
+            {
+                var L2 = 9 + i;
+                s_PackedCoefficients[i] = new Vector4(
+                    probe.coefficients[L2], // L2 RGB 1th xx
+                    probe.coefficients[L2 + 3], // L2 RGB 2th yz
+                    probe.coefficients[L2 + 6], // L2 RGB 3th zz
+                    probe.coefficients[L2 + 9]  // L2 RGB 4th zx
+                );
+                
+            }
+            
+            // final 5th quadratic in L2
+            s_PackedCoefficients[k_PackedCoefficientCount - 1] = new Vector4(
+                probe.coefficients[24],
+                probe.coefficients[25],
+                probe.coefficients[26],
+                1.0f
+                );
             
             material.SetVectorArray(_EasySHCoefficients, s_PackedCoefficients);
         }

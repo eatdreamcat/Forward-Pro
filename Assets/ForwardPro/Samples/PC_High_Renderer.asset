@@ -75,7 +75,8 @@ MonoBehaviour:
   - {fileID: 7833122117494664109}
   - {fileID: 3573653513797426673}
   - {fileID: -3751262535411419207}
-  m_RendererFeatureMap: ad6b866f10d7b46cf1dd38d0ef2a9831b937925d99d6f0cb
+  - {fileID: 692568087392258428}
+  m_RendererFeatureMap: ad6b866f10d7b46cf1dd38d0ef2a9831b937925d99d6f0cb7c89c98f017f9c09
   m_UseNativeRenderPass: 1
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -114,6 +115,19 @@ MonoBehaviour:
   m_CopyDepthMode: 1
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
+--- !u!114 &692568087392258428
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9aedff74251213943b1ac7d6632e9385, type: 3}
+  m_Name: EasyProbeSetup
+  m_EditorClassIdentifier: 
+  m_Active: 1
 --- !u!114 &3573653513797426673
 MonoBehaviour:
   m_ObjectHideFlags: 0

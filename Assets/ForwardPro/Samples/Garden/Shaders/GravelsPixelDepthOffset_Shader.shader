@@ -839,7 +839,9 @@ Shader "Shader Graphs/Gravels_PixelDepthOffset_Shader"
 #else
                 inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.sh, inputData.normalWS);
 #endif
+               
                 inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
+                 inputData.bakedGI = SampleEasySH9(inputData.normalWS, inputData.positionWS, inputData.normalizedScreenSpaceUV, inputData.viewDirectionWS);
                 inputData.shadowMask = SAMPLE_SHADOWMASK(input.staticLightmapUV);
 
 #if defined(DEBUG_DISPLAY)
@@ -1767,6 +1769,7 @@ Shader "Shader Graphs/Gravels_PixelDepthOffset_Shader"
                         inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.sh, inputData.normalWS);
 #endif
                         inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
+                         inputData.bakedGI = SampleEasySH9(inputData.normalWS, inputData.positionWS, inputData.normalizedScreenSpaceUV, inputData.viewDirectionWS);
                         inputData.shadowMask = SAMPLE_SHADOWMASK(input.staticLightmapUV);
 
 #if defined(DEBUG_DISPLAY)

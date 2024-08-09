@@ -707,11 +707,12 @@
     <Reference Include="UnityEditor.UI">
       <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\UnityEditor.UI.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.UI">
-      <HintPath>D:\Projects\Forward-Pro\Library\ScriptAssemblies\UnityEngine.UI.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="UnityEngine.UI.csproj">
+      <Project>{bf0a7820-a94b-1f5c-8c9c-4bfb4e40e376}</Project>
+      <Name>UnityEngine.UI</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
