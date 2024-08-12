@@ -77,7 +77,7 @@ float3 SampleEasySH9(half3 N, float3 positionWS, float2 positionSS, float3 direc
 
     positionWS = AddNoiseToSamplingPosition(positionWS, positionSS, direction);
     
-    float3 uvw = (positionWS - _EasyVolumeWorldOffset) / _EasyProbeVolumeSize;
+    float3 uvw = ((positionWS - _EasyVolumeWorldOffset) / _EasyProbeVolumeSize).xyz;
 
     // clip(uvw);
     // clip(1.0 - uvw + 0.01);

@@ -114,7 +114,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             WriteOutput();
         }
 
-        static void SortByWorldPosition()
+        static void SortByWorldPositionXYZ()
         {
             EasyProbeVolume.s_ProbeCells.Sort((p1, p2) =>
             {
@@ -123,7 +123,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     throw new ArgumentException("Cell can't be null");
                 }
                 
-                int result = p1.position.x.CompareTo(p2.position.x);
+                int result = p1.position.z.CompareTo(p2.position.z);
                 if (result != 0)
                 {
                     return result;
@@ -135,7 +135,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     return result;
                 }
                 
-                return p1.position.z.CompareTo(p2.position.z);
+                return p1.position.x.CompareTo(p2.position.x);
             });
             
             EasyProbeVolume.s_Probes.Sort((p1, p2) =>
@@ -145,7 +145,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     throw new ArgumentException("Cell can't be null");
                 }
                 
-                int result = p1.position.x.CompareTo(p2.position.x);
+                int result = p1.position.z.CompareTo(p2.position.z);
                 if (result != 0)
                 {
                     return result;
@@ -157,7 +157,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     return result;
                 }
                 
-                return p1.position.z.CompareTo(p2.position.z);
+                return p1.position.x.CompareTo(p2.position.x);
             });
         }
 
@@ -323,16 +323,23 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         static void WriteOutput()
         {
            
-            SortByWorldPosition();
+            SortByWorldPositionXYZ();
             {
                 // TODO: should be removed
                 // Test
                 var cellMin = EasyProbeVolume.s_ProbeCells[0].Min;
                 var cellMax = EasyProbeVolume.s_ProbeCells[EasyProbeVolume.s_ProbeCells.Count - 1].Max;
-
-                EasyProbeStreaming.s_ProbeVolumeWorldOffset = new Vector4(cellMin.x, cellMin.y, cellMin.z, 1.0f);
+                var halfSize = EasyProbeVolume.s_ProbeSpacing / 2.0f;
+             
+                EasyProbeStreaming.s_ProbeVolumeWorldOffset = 
+                    new Vector4(cellMin.x - halfSize, cellMin.y - halfSize, cellMin.z - halfSize, 1.0f);
                 EasyProbeStreaming.s_ProbeVolumeSize = cellMax - cellMin;
-                var probeCountPerAxie = EasyProbeStreaming.s_ProbeVolumeSize / EasyProbeVolume.s_ProbeSpacing + Vector3.one;
+                EasyProbeStreaming.s_ProbeVolumeSize += new Vector3(
+                    EasyProbeVolume.s_ProbeSpacing,
+                    EasyProbeVolume.s_ProbeSpacing,
+                    EasyProbeVolume.s_ProbeSpacing
+                );
+                var probeCountPerAxie = EasyProbeStreaming.s_ProbeVolumeSize / EasyProbeVolume.s_ProbeSpacing;
                 
                 Debug.Assert(probeCountPerAxie.x * probeCountPerAxie.y * probeCountPerAxie.z == EasyProbeVolume.s_Probes.Count);
                 AllocBufferData((int)probeCountPerAxie.x, (int)probeCountPerAxie.y, (int)probeCountPerAxie.z);
