@@ -14,6 +14,21 @@ namespace UnityEngine.Rendering.EasyProbeVolume
     {
         public Vector4 cellMinAndSpacing;
         public Vector4 cellMaxAndCellSize;
+        // xyz: perVolumeAxis, w: perCellAxis
+        public Vector4 probeCount;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct EasyCellMetaData
+    {
+        public Vector4 position;
+        // xyz: volume index, w: flatten index
+        public Vector4 cellIndex;
+        // // x:l0l1 x start, y: l0l1 y start, z: l0l1 x end, w: l0l1 y end,
+        // public Vector4 probeDataPerSliceLayoutL0L1;
+        // public Vector4 probeDataPerSliceLayoutL2;
+        // // xy: L0L1 start,end; zw: L1 start,end
+        // public Vector4 probeDataSliceLayout;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -30,6 +45,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         public static string s_MetadataPath = s_OutputDir + "/EasyProbeMetadata.byte";
         public static string s_L0L1DataPath = s_OutputDir + "/EasyProbeL0L1.byte";
         public static string s_L2DataPath = s_OutputDir + "/EasyProbeL2.byte";
+        public static string s_CellDataPath = s_OutputDir + "/EasyProbeCell.byte";
         
         private static int _EasyProbeSHAr = Shader.PropertyToID("_EasyProbeSHAr");
         private static int _EasyProbeSHAg = Shader.PropertyToID("_EasyProbeSHAg");
@@ -160,43 +176,59 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
             var filePath = currentScenePath + path;
             
-            byte[] bytes = File.ReadAllBytes(filePath);
-
-            return bytes;
+            try
+            {
+                byte[] bytes = File.ReadAllBytes(filePath);
+                return bytes;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[EasyProbeStreaming](ReadByteFromRelativePath):" + e.Message);
+            }
+            
+            return null;
         }
         
-        static void LoadMetadata()
+        static bool LoadMetadata()
         {
             int size = Marshal.SizeOf(typeof(EasyProbeMetaData));
             var bytes = ReadByteFromRelativePath(s_MetadataPath);
             if (bytes.Length != size)
-            {
-#if UNITY_EDITOR
-                throw new Exception("[EasyProbeStreaming](LoadMetadata): Byte array size does not match the size of the structure.");
-#else
-                 Debug.LogError("[EasyProbeStreaming](LoadMetadata): Byte array size does not match the size of the structure.");
-#endif
+            { 
+                Debug.LogError("[EasyProbeStreaming](LoadMetadata): Byte array size does not match the size of the structure.");
+                return false;
             }
 
             IntPtr ptr = Marshal.AllocHGlobal(size);
-
+            bool isSuccess = false;
             try
             {
                 Marshal.Copy(bytes, 0, ptr, size);
                 s_Metadata = Marshal.PtrToStructure<EasyProbeMetaData>(ptr);
                 s_NeedReloadMetadata = false;
+                isSuccess = true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[EasyProbeStreaming](LoadMetadata): {e.Message}");
             }
             finally
             {
                 Marshal.FreeHGlobal(ptr);
             }
+
+            return isSuccess;
         }
         
         public static void UpdateCellStreaming(ScriptableRenderContext context, ref RenderingData renderingData)
         {
             if (s_NeedReloadMetadata)
             {
-                LoadMetadata();
+                if (!LoadMetadata())
+                {
+                    Debug.LogError("[EasyProbeStreaming](UpdateCellStreaming): load metadata error.");
+                    return;
+                }
                 
             }
 
@@ -263,37 +295,51 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             {
                 // L0L1
                 var l0l1Bytes = ReadByteFromRelativePath(s_L0L1DataPath);
-                var l0l1Array = new NativeArray<byte>(l0l1Bytes.Length, Allocator.Temp,
-                    NativeArrayOptions.UninitializedMemory);
-                l0l1Array.CopyFrom(l0l1Bytes);
-                var l0l1HalfArray = l0l1Array.Slice().SliceConvert<half4>();
-                
-                for (int i = 0; i < l0l1HalfArray.Length; i+=3)
+
+                if (l0l1Bytes == null)
                 {
-                    int index = i / 3;
-                    s_SHAr[index] = l0l1HalfArray[i];
-                    s_SHAg[index] = l0l1HalfArray[i + 1];
-                    s_SHAb[index] = l0l1HalfArray[i + 2];
+                    Debug.LogError("[EasyProbeStreaming](ProcessStreaming): failed to load l0l1 data.");
+                    return;
                 }
 
-                l0l1Array.Dispose();
+                {
+                    using var l0l1Array = new NativeArray<byte>(l0l1Bytes.Length, Allocator.Temp,
+                        NativeArrayOptions.UninitializedMemory);
+                    l0l1Array.CopyFrom(l0l1Bytes);
+                    var l0l1HalfArray = l0l1Array.Slice().SliceConvert<half4>();
+                
+                    for (int i = 0; i < l0l1HalfArray.Length; i+=3)
+                    {
+                        int index = i / 3;
+                        s_SHAr[index] = l0l1HalfArray[i];
+                        s_SHAg[index] = l0l1HalfArray[i + 1];
+                        s_SHAb[index] = l0l1HalfArray[i + 2];
+                    }
+                }
                 
                 // L2
                 var l2Bytes = ReadByteFromRelativePath(s_L2DataPath);
-                var l2Array = new NativeArray<byte>(l2Bytes.Length, Allocator.Temp,
-                    NativeArrayOptions.ClearMemory);
-                l2Array.CopyFrom(l2Bytes);
-                var l2HalfArray = l2Array.Slice().SliceConvert<half4>();
-                for (int i = 0; i < l2HalfArray.Length; i+=4)
+
+                if (l2Bytes == null)
                 {
-                    int index = i / 4;
-                    s_SHBr[index] = l2HalfArray[i];
-                    s_SHBg[index] = l2HalfArray[i + 1];
-                    s_SHBb[index] = l2HalfArray[i + 2];
-                    s_SHC[index] = l2HalfArray[i + 3];
+                    Debug.LogError("[EasyProbeStreaming](ProcessStreaming): failed to load l2 data.");
+                    return;
                 }
 
-                l2Array.Dispose();
+                {
+                    using var l2Array = new NativeArray<byte>(l2Bytes.Length, Allocator.Temp,
+                        NativeArrayOptions.ClearMemory);
+                    l2Array.CopyFrom(l2Bytes);
+                    var l2HalfArray = l2Array.Slice().SliceConvert<half4>();
+                    for (int i = 0; i < l2HalfArray.Length; i+=4)
+                    {
+                        int index = i / 4;
+                        s_SHBr[index] = l2HalfArray[i];
+                        s_SHBg[index] = l2HalfArray[i + 1];
+                        s_SHBb[index] = l2HalfArray[i + 2];
+                        s_SHC[index] = l2HalfArray[i + 3];
+                    }
+                }
             }
             
         }

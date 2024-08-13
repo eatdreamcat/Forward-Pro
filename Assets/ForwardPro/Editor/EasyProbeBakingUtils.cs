@@ -126,26 +126,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return sampleDir;
         }
         
-        // public static List<Vector3> s_SamplerDirs = new()
-        // {
-        //     Vector3.down,
-        //     Vector3.up,
-        //     Vector3.forward,
-        //     Vector3.back,
-        //     Vector3.left,
-        //     Vector3.right,
-        //     
-        //     Vector3.Normalize(Vector3.forward + Vector3.left + Vector3.up),
-        //     Vector3.Normalize(Vector3.forward + Vector3.right + Vector3.up),
-        //     Vector3.Normalize(Vector3.back + Vector3.right + Vector3.up),
-        //     Vector3.Normalize(Vector3.back + Vector3.left + Vector3.up),
-        //     Vector3.Normalize(Vector3.forward + Vector3.left + Vector3.down),
-        //     Vector3.Normalize(Vector3.forward + Vector3.right + Vector3.down),
-        //     Vector3.Normalize(Vector3.back + Vector3.right + Vector3.down),
-        //     Vector3.Normalize(Vector3.back + Vector3.left + Vector3.down),
-        //     
-        // };
-
         static float CalculatePointLightAttenuation(float distanceSqr, float rangeSqr, float k)
         {
             float lightAtten = 1.0f / Mathf.Max(0.0001f, distanceSqr);
@@ -160,7 +140,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             var position = probe.position;
             var dirToLight = light.transform.position - position;
             var color = light.color *
-                Mathf.Max(0, Vector3.Dot(direction, dirToLight.normalized));
+                        Mathf.Max(0, Vector3.Dot(direction, dirToLight.normalized) * 0.5f + 0.5f);
             
             return color;
         }
@@ -177,7 +157,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         }
         
         
-        public static void BakeProbe(Light light, EasyProbe probe/*, int dirIndexStart, int dirIndexEnd*/, int sampleCount)
+        public static void BakeProbe(Light light, EasyProbe probe, int sampleCount)
         {
             var dirToLight = light.transform.position - probe.position;
             var lightAtten =
@@ -193,42 +173,37 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             }
             probe.visibilty = Mathf.Max(probe.visibilty, visibilty);
             
-            // for (int dirIndex = dirIndexStart; dirIndex < dirIndexEnd; ++dirIndex)
-            // {
-                // var dir = s_SamplerDirs[dirIndex];
-                var dir = dirToLight.normalized;
-                for (int sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
-                {
-                    var sampleDir = GetCosineWeightedRandomDirection(
-                        HaltonSequence.Get((sampleIndex & 1023) + 1, 2), 
-                        HaltonSequence.Get((sampleIndex & 1023) + 1, 3), 
-                        dir, 
-                        probe.position,
-                        out var pdf
-                    );
+         
+            var dir = dirToLight.normalized;
+            for (int sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
+            {
+                var sampleDir = GetCosineWeightedRandomDirection(
+                    HaltonSequence.Get((sampleIndex & 1023) + 1, 2), 
+                    HaltonSequence.Get((sampleIndex & 1023) + 1, 3), 
+                    dir, 
+                    probe.position,
+                    out var pdf
+                );
                     
-                    var radiance = SampleLight(sampleDir, probe, light) * lightAtten * visibilty / pdf / sampleCount;
+                var radiance = SampleLight(sampleDir, probe, light) * lightAtten * visibilty / pdf / sampleCount;
                         
-                    // probe.coefficients.Count = 27
-                    for (int coefficientIndex = 0; coefficientIndex < probe.coefficients.Count; coefficientIndex += 3)
-                    {
-                        var level = coefficientIndex / 3;
-                        probe.coefficients[coefficientIndex] +=
-                            SHBasicFull(sampleDir, level) * radiance.r *
-                            BasicConstant(level);
-                        probe.coefficients[coefficientIndex + 1] +=
-                            SHBasicFull(sampleDir, level) * radiance.g *
-                            BasicConstant(level);
-                        probe.coefficients[coefficientIndex + 2] +=
-                            SHBasicFull(sampleDir, level) * radiance.b *
-                            BasicConstant(level);
-                    }
+                // probe.coefficients.Count = 27
+                for (int coefficientIndex = 0; coefficientIndex < probe.coefficients.Count; coefficientIndex += 3)
+                {
+                    var level = coefficientIndex / 3;
+                    probe.coefficients[coefficientIndex] +=
+                        SHBasicFull(sampleDir, level) * radiance.r *
+                        BasicConstant(level);
+                    probe.coefficients[coefficientIndex + 1] +=
+                        SHBasicFull(sampleDir, level) * radiance.g *
+                        BasicConstant(level);
+                    probe.coefficients[coefficientIndex + 2] +=
+                        SHBasicFull(sampleDir, level) * radiance.b *
+                        BasicConstant(level);
                 }
+            }
                 
-                // Test
-                // one dir from light
-                // break;
-            // }
+            
         }
     }
 }

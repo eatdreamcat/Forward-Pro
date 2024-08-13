@@ -54,7 +54,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         
         public enum SampleCount
         {
-          
+            _4 = 4,
+            _8 = 8,
+            _16 = 16,
             _32 = 32,
             _64 = 64,
             _128 = 128,
@@ -71,9 +73,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             Visibility,
             Diffuse
         }
-
-        // private SampleDirDensity m_SampleDirDensity = SampleDirDensity._6;
-        private SampleCount m_SampleCount = SampleCount._64;
+        
+        private SampleCount m_SampleCount = SampleCount._4;
         
         private static List<EasyProbeLightSource> s_LightSources = new();
         private static List<Light> s_Lights = new();
@@ -116,7 +117,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         private static float s_ProbeRadius = 0.1f;
         private static bool s_DisplayCell = false;
         private static bool s_DisplayProbe = false;
-        private static ProbeDebug s_DebugDraw = ProbeDebug.Attenuation; 
+        private static ProbeDebug s_DebugDraw = ProbeDebug.Diffuse; 
         
         public static int GetAdjustedMultiple(int a, int b, int max)
         {
@@ -238,7 +239,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                         new Bounds(light.transform.position, new Vector3(light.range, light.range, light.range)),
                         light));
                 }
-                EasyProbeBaking.Bake(s_LightSources/*, m_SampleDirDensity*/, (int)m_SampleCount);
+                EasyProbeBaking.Bake(s_LightSources, (int)m_SampleCount);
             }
         }
 
