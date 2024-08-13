@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.EasyProbeVolume;
@@ -5,8 +6,25 @@ using UnityEngine.Rendering.Universal;
 
 public class EasyProbeSetup : ScriptableRendererFeature
 {
+    private static EasyProbeSetup s_Instance;
+    public static EasyProbeSetup Instance => s_Instance;
+
+    public enum SHBand
+    {
+        L0L1,
+        L2
+    }
+    
+    [Serializable]
+    public class EasyProbeSettings
+    {
+        public SHBand band;
+    }
+        
     class EasyProbeSetupPass : ScriptableRenderPass
     {
+        
+        
         // This method is called before executing the render pass.
         // It can be used to configure render targets and their clear state. Also to create temporary render target textures.
         // When empty this render pass will render to the active camera render target.
@@ -22,7 +40,7 @@ public class EasyProbeSetup : ScriptableRendererFeature
         // You don't have to call ScriptableRenderContext.submit, the render pipeline will call it at specific points in the pipeline.
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
-            EasyProbeStreaming.PushRuntimeData(context, renderingData.cameraData);
+            EasyProbeStreaming.UpdateCellStreaming(context, ref renderingData);
         }
 
         // Cleanup any allocated resources that were created during the execution of this render pass.
@@ -33,9 +51,12 @@ public class EasyProbeSetup : ScriptableRendererFeature
 
     EasyProbeSetupPass m_ScriptablePass;
 
+    public EasyProbeSettings m_Settings;
+
     /// <inheritdoc/>
     public override void Create()
     {
+        s_Instance = this;
         m_ScriptablePass = new EasyProbeSetupPass();
 
         // Configures where the render pass should be injected.
@@ -53,8 +74,9 @@ public class EasyProbeSetup : ScriptableRendererFeature
     {
         base.Dispose(disposing);
         
-        EasyProbeStreaming.PipelineDisposed();
-        
+        EasyProbeStreaming.Dispose();
+
+        s_Instance = null;
     }
 }
 

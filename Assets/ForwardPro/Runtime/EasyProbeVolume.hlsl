@@ -92,16 +92,16 @@ float3 SampleEasySH9(half3 N, float3 positionWS, float2 positionSS, float3 direc
     half4 shCr = half4(SAMPLE_TEXTURE3D_LOD(_EasyProbeSHC, sampler_EasyProbeSHC, uvw, 0).rgba);
 
     // Linear + constant polynomial terms
-    float3 res = SHEvalLinearL0L1(N, shAr, shAg, shAb);
-
+    float3 res = max(0, SHEvalLinearL0L1(N, shAr, shAg, shAb));
+    
     // Quadratic polynomials
-    res += SHEvalLinearL2(N, shBr, shBg, shBb, shCr);
+    res += max(0, SHEvalLinearL2(N, shBr, shBg, shBb, shCr));
 
     #ifdef UNITY_COLORSPACE_GAMMA
     res = LinearToSRGB(res);
     #endif
     
-    return max(0, res) * _EasyProbeIntensity;
+    return res * _EasyProbeIntensity;
 }
 
 #endif

@@ -181,7 +181,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         {
             var dirToLight = light.transform.position - probe.position;
             var lightAtten =
-                CalculatePointLightAttenuation(dirToLight.sqrMagnitude, light.range, EasyProbeVolume.s_PointAttenConstantK);
+                CalculatePointLightAttenuation(dirToLight.sqrMagnitude, light.range, EasyProbeBaking.s_PointAttenConstantK);
             lightAtten *= light.intensity;
             probe.atten = Mathf.Max(lightAtten, probe.atten);
             

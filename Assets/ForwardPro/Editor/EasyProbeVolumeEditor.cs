@@ -51,14 +51,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 k_GizmoColorBase
             };
         }
-
-        // public enum SampleDirDensity
-        // {
-        //     _6 = 6,
-        //     _8 = 8,
-        //     _14 = 14
-        // }
-
+        
         public enum SampleCount
         {
           
@@ -171,14 +164,14 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             
             // serialized.probeSpacing.intValue = EditorGUILayout.IntSlider(Styles.s_ProbeSpacing, serialized.probeSpacing.intValue, 1,
             //     EasyProbeVolume.s_MaxProbeSpacing);
-            EasyProbeVolume.s_ProbeSpacing = EditorGUILayout.IntSlider(Styles.s_ProbeSpacing, EasyProbeVolume.s_ProbeSpacing, 1,
-                EasyProbeVolume.s_MaxProbeSpacing);
+            EasyProbeBaking.s_ProbeSpacing = EditorGUILayout.IntSlider(Styles.s_ProbeSpacing, EasyProbeBaking.s_ProbeSpacing, 1,
+                EasyProbeBaking.s_MaxProbeSpacing);
             EditorGUILayout.Space();
-            EasyProbeVolume.s_ProbeCellSize = EditorGUILayout.IntSlider(Styles.s_ProbeCellSize, 
-                EasyProbeVolume.s_ProbeCellSize, EasyProbeVolume.s_ProbeSpacing,
-                EasyProbeVolume.s_MaxProbeCellSize);
-            EasyProbeVolume.s_ProbeCellSize = GetAdjustedMultiple(EasyProbeVolume.s_ProbeSpacing,
-                EasyProbeVolume.s_ProbeCellSize, EasyProbeVolume.s_MaxProbeCellSize);
+            EasyProbeBaking.s_ProbeCellSize = EditorGUILayout.IntSlider(Styles.s_ProbeCellSize, 
+                EasyProbeBaking.s_ProbeCellSize, EasyProbeBaking.s_ProbeSpacing,
+                EasyProbeBaking.s_MaxProbeCellSize);
+            EasyProbeBaking.s_ProbeCellSize = GetAdjustedMultiple(EasyProbeBaking.s_ProbeSpacing,
+                EasyProbeBaking.s_ProbeCellSize, EasyProbeBaking.s_MaxProbeCellSize);
             EasyProbeVolume.s_EasyPVSamplingNoise = EditorGUILayout.Slider(Styles.s_ProbeVolumeNoise,
                 EasyProbeVolume.s_EasyPVSamplingNoise, 0.0f, 1.0f);
             EasyProbeVolume.s_EasyProbeIntensity = EditorGUILayout.Slider(Styles.s_ProbeVolumeIntensity,
@@ -189,8 +182,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
             // m_SampleDirDensity = (SampleDirDensity)EditorGUILayout.EnumPopup(Styles.s_SampleDirDensity, m_SampleDirDensity);
             m_SampleCount = (SampleCount)EditorGUILayout.EnumPopup(Styles.s_SampleCount, m_SampleCount);
-            EasyProbeVolume.s_PointAttenConstantK =
-                EditorGUILayout.Slider(Styles.s_PointLightAttenuationConstant, EasyProbeVolume.s_PointAttenConstantK,
+            EasyProbeBaking.s_PointAttenConstantK =
+                EditorGUILayout.Slider(Styles.s_PointLightAttenuationConstant, EasyProbeBaking.s_PointAttenConstantK,
                     0.01f, 0.1f);
             EditorGUILayout.Space();
 
@@ -308,7 +301,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 // Draw Cell
                 if (s_DisplayCell)
                 {
-                    foreach (var cell in EasyProbeVolume.s_ProbeCells)
+                    foreach (var cell in EasyProbeBaking.s_ProbeCells)
                     {
                         using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one)))
                         {
@@ -329,7 +322,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 // Draw Probe
                 if (s_DisplayProbe)
                 {
-                    foreach (var probe in EasyProbeVolume.s_Probes)
+                    foreach (var probe in EasyProbeBaking.s_Probes)
                     {
                         using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one)))
                         {

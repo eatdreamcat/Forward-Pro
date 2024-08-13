@@ -8,23 +8,14 @@ namespace UnityEngine.Rendering.EasyProbeVolume
     [AddComponentMenu("Rendering/Easy Probe Volume")]
     public class EasyProbeVolume : MonoBehaviour
     {
-        public static int s_ProbeSpacing = 2;
-        public static int s_ProbeCellSize = 6;
-        public static float s_PointAttenConstantK = 0.1f;
+        // TODO: move to renderfeature
         public static float s_EasyPVSamplingNoise = 0.0f;
         public static float s_EasyProbeIntensity = 1.0f;
         
         public static List<EasyProbeVolume> s_ProbeVolumes = new();
-        public static List<EasyProbe> s_Probes = new();
-        public static List<EasyProbeCell> s_ProbeCells = new();
-        
         private List<Light> m_Lights = new();
         
-        public static int s_MaxProbeSpacing = 10;
-        public static int s_MaxProbeCellSize = 30;
-        
         public Vector3 volumeSize = new Vector3(10, 10, 10);
-        // [HideInInspector, Min(1)] public int probeSpacing = 1;
 
         [HideInInspector] public Transform lightRoot = null;
 
