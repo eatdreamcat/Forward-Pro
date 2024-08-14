@@ -400,11 +400,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
         static bool PrepareBaking()
         {
-            if (s_ProbeCells.Count <= 0 || s_Probes.Count <= 0)
-            {
-                PlaceProbes();
-            }
-
+            PlaceProbes();
             return s_ProbeCells.Count > 0;
         }
 
