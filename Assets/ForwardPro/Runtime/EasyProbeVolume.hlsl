@@ -80,6 +80,8 @@ float3 SampleEasySH9(half3 N, float3 positionWS, float2 positionSS, float3 direc
     // TODO: uvw offset
     float3 uvw = ((positionWS - _EasyVolumeWorldOffset) / _EasyProbeVolumeSize).xyz;
 
+    float mask = step(0.001, uvw) * step(uvw, 0.999);
+
     half4 shAr = half4(SAMPLE_TEXTURE3D_LOD(_EasyProbeSHAr, sampler_EasyProbeSHAr, uvw, 0).rgba);
     half4 shAg = half4(SAMPLE_TEXTURE3D_LOD(_EasyProbeSHAg, sampler_EasyProbeSHAg, uvw, 0).rgba);
     half4 shAb = half4(SAMPLE_TEXTURE3D_LOD(_EasyProbeSHAb, sampler_EasyProbeSHAb, uvw, 0).rgba);
@@ -92,13 +94,13 @@ float3 SampleEasySH9(half3 N, float3 positionWS, float2 positionSS, float3 direc
     float3 res = max(0, SHEvalLinearL0L1(N, shAr, shAg, shAb));
     
     // Quadratic polynomials
-    res += max(0, SHEvalLinearL2(N, shBr, shBg, shBb, shCr));
+    // res += max(0, SHEvalLinearL2(N, shBr, shBg, shBb, shCr));
 
     #ifdef UNITY_COLORSPACE_GAMMA
     res = LinearToSRGB(res);
     #endif
     
-    return res * _EasyProbeIntensity;
+    return res * _EasyProbeIntensity * mask;
 }
 
 #endif

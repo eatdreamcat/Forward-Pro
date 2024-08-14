@@ -36,12 +36,10 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         // public Vector4 probeDataSliceLayout;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    public struct EasyProbeBandL0L1
+    public struct ProbeBytesStreaming
     {
-        public NativeArray<half4> shAr;
-        public NativeArray<half4> shAb;
-        public NativeArray<half4> shAc;
+        public int offset;
+        public int length;
     }
     
     public static class EasyProbeStreaming 
@@ -104,9 +102,16 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
         private static int s_BytesInUse = 0;
 
-        private static FileStream s_FileStream;
+        private static List<ProbeBytesStreaming> s_L0L1Requests = new();
+        private static List<ProbeBytesStreaming> s_L2Requests = new();
+        private static List<byte> s_L0L1TempBuffer = new();
+        private static List<byte> s_L2TempBuffer = new();
+            
         private static EasyProbeSetup.MemoryBudget s_Budget;
         private static ProbeVolumeSHBands s_Bands;
+
+        private const int k_L0L1Stride = 64 * 3;
+        private const int k_L2Stride = 64 * 4;
         
         static bool AllocBufferDataIfNeeded(ref Texture probeRT, ref NativeArray<half4> sh,
             int width, int height, int depth, string name, bool allocRenderTexture = false)
@@ -138,14 +143,17 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return hasAlloc;
         }
         
-        static int EstimateMemoryCost(int width, int height, int depth, GraphicsFormat format)
+        public static int EstimateTextureMemoryCost(int width, int height, int depth, GraphicsFormat format)
         {
             int elementSize = format == GraphicsFormat.R16G16B16A16_SFloat ? 8 :
                 format == GraphicsFormat.R8G8B8A8_UNorm ? 4 : 1;
             return (width * height * depth) * elementSize;
         }
         
-        
+        public static int EstimateBufferMemoryCost(int width, int height, int depth)
+        {
+            return (width * height * depth) * 64;
+        }
         
         public static Texture CreateDataTexture(int width, int height, int depth, GraphicsFormat format, string name, bool allocateRendertexture)
         {
@@ -180,7 +188,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return texture;
         }
 
-        static byte[] ReadByteFromRelativePath(string path)
+        static byte[] ReadBytesFromRelativePath(string path)
         {
             var currentScenePath = SceneManagement.SceneManager.GetActiveScene().path;
             var lastIndexOfSep = currentScenePath.LastIndexOf("/");
@@ -201,11 +209,36 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return null;
         }
         
+        public static byte[] ReadBytesFromRelativePath(string filePath, long startPosition, int length)
+        {
+            try
+            {
+                byte[] buffer = new byte[length];
+                using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                {
+                    fs.Seek(startPosition, SeekOrigin.Begin);
+                    int bytesRead = fs.Read(buffer, 0, length);
+                    if (bytesRead < length)
+                    {
+                        Array.Resize(ref buffer, bytesRead);
+                    }
+                }
+                
+                return buffer;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[EasyProbeStreaming](ReadByteFromRelativePath):" + e.Message);
+            }
+
+            return null;
+        }
+        
         public static bool LoadMetadata(ref EasyProbeMetaData metaData, string volumeHash = "")
         {
             int size = Marshal.SizeOf(typeof(EasyProbeMetaData));
-            // TODO 
-            var bytes = ReadByteFromRelativePath(s_MetadataPath);
+            // TODO volumeHash
+            var bytes = ReadBytesFromRelativePath(s_MetadataPath);
             if (bytes.Length != size)
             { 
                 Debug.LogError("[EasyProbeStreaming](LoadMetadata): Byte array size does not match the size of the structure.");
@@ -249,7 +282,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
             var camera = renderingData.cameraData.camera;
             
-            ProcessStreaming(camera);
+            ProcessStreaming(camera, radius);
             
             UploadTextureData();
             
@@ -265,8 +298,122 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             (output as Texture3D).Apply();
         }
 
-        public static void ProcessStreaming(Camera camera)
+        public static Vector3Int CalculateBufferSize(ref EasyProbeMetaData metaData, Vector3Int boxMin, Vector3Int boxMax)
         {
+            var width = (metaData.probeCountPerCellAxis - 1) * (boxMax.x - boxMin.x) + 1;
+            var height = (metaData.probeCountPerCellAxis - 1) * (boxMax.y - boxMin.y) + 1;
+            var depth = (metaData.probeCountPerCellAxis - 1) * (boxMax.z - boxMin.z) + 1;
+            return new Vector3Int(width, height, depth);
+        }
+
+        static void DoStreaming(Camera camera, float radius)
+        {
+             var cameraAABB = CalculateSphereAABB(CalculateCameraFrustumSphere(ref s_Metadata, camera, radius));
+            CalculateCellRange(cameraAABB, out var clampedCellMin, out var clampedCellMax, out var boxMin, out var boxMax);
+            
+            s_ProbeVolumeSize = boxMax - boxMin;
+            s_ProbeVolumeWorldOffset = new Vector4(boxMin.x, boxMin.y, boxMin.z, 1.0f);
+            
+            s_L0L1TempBuffer.Clear();
+            s_L0L1Requests.Clear();
+            
+            s_L2TempBuffer.Clear();
+            s_L2Requests.Clear();
+            
+            var probeCountPerSlice = s_Metadata.probeCountPerVolumeAxis.x * s_Metadata.probeCountPerVolumeAxis.y; 
+            var cellCountPerAxis = (clampedCellMax - clampedCellMin) / s_Metadata.cellSize;
+            var probeCountPerAxis = (s_Metadata.probeCountPerCellAxis - 1) * cellCountPerAxis + Vector3Int.one;
+            var l0l1ProbeDataLineLength = probeCountPerAxis.x * k_L0L1Stride;
+            
+            var cellOffset = (clampedCellMin - s_Metadata.cellMin) / s_Metadata.cellSize;
+            var probeStartAtX = cellOffset.x * (s_Metadata.probeCountPerCellAxis - 1)
+                                + cellOffset.y * s_Metadata.probeCountPerVolumeAxis.x
+                                + cellOffset.z * probeCountPerSlice;
+            
+            for (int slice = 0; slice < probeCountPerAxis.z; ++slice)
+            {
+                for (int line = 0; line < probeCountPerAxis.y; ++line)
+                {
+                    var l0l1ProbeDataLineStart = (probeStartAtX + slice * probeCountPerSlice + line * probeCountPerAxis.y) * k_L0L1Stride;
+                    s_L0L1Requests.Add(new ProbeBytesStreaming()
+                    {
+                        offset = l0l1ProbeDataLineStart,
+                        length = l0l1ProbeDataLineLength
+                    });
+                }
+            }
+
+            #region Calculate Buffer Size
+
+            var size = CalculateBufferSize(ref s_Metadata, boxMin, boxMax);
+            var width = size.x;
+            var height = size.y;
+            var depth = size.z;
+            
+            #endregion
+
+            #region Alloc Buffer
+
+            AllocBufferDataIfNeeded(ref s_EasyProbeSHAr, ref s_SHAr,
+                width, height, depth, s_EasyProbeSHArName);
+            AllocBufferDataIfNeeded(ref s_EasyProbeSHAg, ref s_SHAg,
+                width, height, depth, s_EasyProbeSHAgName);
+            AllocBufferDataIfNeeded(ref s_EasyProbeSHAb, ref s_SHAb,
+                width, height, depth, s_EasyProbeSHAbName);
+            
+            AllocBufferDataIfNeeded(ref s_EasyProbeSHBr, ref s_SHBr,
+                width, height, depth, s_EasyProbeSHBrName);
+            AllocBufferDataIfNeeded(ref s_EasyProbeSHBg, ref s_SHBg,
+                width, height, depth, s_EasyProbeSHBgName);
+            AllocBufferDataIfNeeded(ref s_EasyProbeSHBb, ref s_SHBb,
+                width, height, depth, s_EasyProbeSHBbName);
+            
+            AllocBufferDataIfNeeded(ref s_EasyProbeSHC, ref s_SHC,
+                width, height, depth, s_EasyProbeSHCName);
+
+            #endregion
+            
+            #region Streaming Loading
+
+            // L0L1
+            while (s_L0L1Requests.Count < 0)
+            {
+                var request = s_L0L1Requests[0];
+                var bytes = ReadBytesFromRelativePath(s_L0L1DataPath, request.offset, request.length);
+                
+                if (bytes == null)
+                {
+                    Debug.LogError($"[EasyProbeStreaming](ProcessStreaming): failed to load l0l1 data at offset {request.offset}");
+                    return;
+                }
+                
+                s_L0L1TempBuffer.AddRange(bytes);
+                s_L0L1Requests.RemoveAt(0);
+            }
+            
+            {
+                using var l0l1Array = new NativeArray<byte>(s_L0L1TempBuffer.Count, Allocator.Temp,
+                    NativeArrayOptions.UninitializedMemory);
+                l0l1Array.CopyFrom(s_L0L1TempBuffer.ToArray());
+                var l0l1HalfArray = l0l1Array.Slice().SliceConvert<half4>();
+                    
+                for (int i = 0; i < l0l1HalfArray.Length; i += 3)
+                {
+                    int index = i / 3;
+                    s_SHAr[index] = l0l1HalfArray[i];
+                    s_SHAg[index] = l0l1HalfArray[i + 1];
+                    s_SHAb[index] = l0l1HalfArray[i + 2];
+                }
+            }
+            
+            #endregion
+        }
+        
+        public static void ProcessStreaming(Camera camera, float radius)
+        {
+            
+            #region TestCode
+            
             var cellMin = s_Metadata.cellMin;
             var cellMax = s_Metadata.cellMax;
             var probeSpacing = s_Metadata.probeSpacing;
@@ -283,10 +430,10 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             );
             
             var probeCountPerAxie = s_ProbeVolumeSize / probeSpacing;
-            int width = (int)probeCountPerAxie.x;
-            int height = (int)probeCountPerAxie.y;
-            int depth = (int)probeCountPerAxie.z;
-
+            var width = (int)probeCountPerAxie.x;
+            var height = (int)probeCountPerAxie.y;
+            var depth = (int)probeCountPerAxie.z;
+            
             var hasAlloc = false;
             
             hasAlloc |= AllocBufferDataIfNeeded(ref s_EasyProbeSHAr, ref s_SHAr,
@@ -305,25 +452,25 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             
             hasAlloc |= AllocBufferDataIfNeeded(ref s_EasyProbeSHC, ref s_SHC,
                 width, height, depth, s_EasyProbeSHCName);
-
+            
             if (hasAlloc)
             {
                 // L0L1
-                var l0l1Bytes = ReadByteFromRelativePath(s_L0L1DataPath);
-
+                var l0l1Bytes = ReadBytesFromRelativePath(s_L0L1DataPath);
+            
                 if (l0l1Bytes == null)
                 {
                     Debug.LogError("[EasyProbeStreaming](ProcessStreaming): failed to load l0l1 data.");
                     return;
                 }
-
+            
                 {
                     using var l0l1Array = new NativeArray<byte>(l0l1Bytes.Length, Allocator.Temp,
                         NativeArrayOptions.UninitializedMemory);
                     l0l1Array.CopyFrom(l0l1Bytes);
                     var l0l1HalfArray = l0l1Array.Slice().SliceConvert<half4>();
-                
-                    for (int i = 0; i < l0l1HalfArray.Length; i+=3)
+                    
+                    for (int i = 0; i < l0l1HalfArray.Length; i += 3)
                     {
                         int index = i / 3;
                         s_SHAr[index] = l0l1HalfArray[i];
@@ -331,22 +478,22 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                         s_SHAb[index] = l0l1HalfArray[i + 2];
                     }
                 }
-                
+            
                 // L2
-                var l2Bytes = ReadByteFromRelativePath(s_L2DataPath);
-
+                var l2Bytes = ReadBytesFromRelativePath(s_L2DataPath);
+            
                 if (l2Bytes == null)
                 {
                     Debug.LogError("[EasyProbeStreaming](ProcessStreaming): failed to load l2 data.");
                     return;
                 }
-
+            
                 {
                     using var l2Array = new NativeArray<byte>(l2Bytes.Length, Allocator.Temp,
                         NativeArrayOptions.UninitializedMemory);
                     l2Array.CopyFrom(l2Bytes);
                     var l2HalfArray = l2Array.Slice().SliceConvert<half4>();
-                    for (int i = 0; i < l2HalfArray.Length; i+=4)
+                    for (int i = 0; i < l2HalfArray.Length; i += 4)
                     {
                         int index = i / 4;
                         s_SHBr[index] = l2HalfArray[i];
@@ -357,6 +504,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 }
             }
             
+            
+            #endregion
         }
 
         static Vector3 Max3(Vector3 a, Vector3 b)
@@ -399,7 +548,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             );
         }
         
-        public static void StreamingCells(Bounds cameraAABB, 
+        public static void CalculateCellRange(Bounds cameraAABB, 
             out Vector3Int clampedCellMin, 
             out Vector3Int clampedCellMax,
             out Vector3Int boxMin,
@@ -430,7 +579,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return new Bounds(new Vector3(sphere.x, sphere.y, sphere.z), Vector3.one * sphere.w * 2f);
         }
         
-        public static Vector4 CalculateCameraFrustumSphere(Camera camera, float radius)
+        public static Vector4 CalculateCameraFrustumSphere(ref EasyProbeMetaData metaData, Camera camera,float radius)
         {
             Vector3[] nearCorners = new Vector3[4];
             
@@ -453,6 +602,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             var distanceFromTopLeftNearCorner = Vector3.Distance(centerOfNearPlane, nearCorners[0]);
 
             radius = Mathf.Max(radius, distanceFromTopLeftNearCorner * 1.4142135623730951f);
+            radius = Mathf.Max(metaData.cellSize / 2f, radius);
             
             var distanceFromNearCenter = Mathf.Sqrt(radius * radius - distanceFromTopLeftNearCorner * distanceFromTopLeftNearCorner);
             Vector3 center = Vector3.zero;
@@ -560,7 +710,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
             s_NeedReloadMetadata = true;
             
-            s_FileStream?.Dispose();
+            // s_FileStream?.Dispose();
             
         }
     }

@@ -21,9 +21,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             High
         }
 
-        public static int k_BoundingRadiusLow = 50;
-        public static int k_BoundingRadiusMedium = 100;
-        public static int k_BoundingRadiusHigh = 150;
+        public static int k_BoundingRadiusLow = 5;
+        public static int k_BoundingRadiusMedium = 10;
+        public static int k_BoundingRadiusHigh = 15;
 
         [Serializable]
         public class EasyProbeSettings

@@ -278,12 +278,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 CheckCollider();
             }
             
-            // EditorGUILayout.Space();
-            // if (GUILayout.Button("Place Probes"))
-            // {
-            //     EasyProbeBaking.PlaceProbes();
-            // }
-            
             EditorGUILayout.Space();
             if (GUILayout.Button("Bake"))
             {
@@ -442,7 +436,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                             break;
                     }
                     var boundingSphere = 
-                        EasyProbeStreaming.CalculateCameraFrustumSphere(probeVolume.streamingCamera, radius * s_RadiusScale);
+                        EasyProbeStreaming.CalculateCameraFrustumSphere(ref s_EasyProbeMetadata, probeVolume.streamingCamera, radius * s_RadiusScale);
                     var sphereAABB = EasyProbeStreaming.CalculateSphereAABB(boundingSphere);
 
                     using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one)))
@@ -461,7 +455,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                         // Draw Streaming Cells
                         if (s_DisplayCell && !s_NeedReloadMetadata)
                         {
-                            EasyProbeStreaming.StreamingCells(sphereAABB, out var cellBoxMin, out var cellBoxMax
+                            EasyProbeStreaming.CalculateCellRange(sphereAABB, out var cellBoxMin, out var cellBoxMax
                                 , out var _, out var _);
                             DrawCell(cellBoxMin, cellBoxMax);
                         }
