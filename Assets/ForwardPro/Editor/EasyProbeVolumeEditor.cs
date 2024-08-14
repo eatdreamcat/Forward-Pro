@@ -34,12 +34,19 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             internal static readonly GUIContent s_ProbeDebugType = new GUIContent("DebugDraw");
             internal static readonly GUIContent s_ProbeVolumeNoise = new GUIContent("Probe Sampling Noise");
             internal static readonly GUIContent s_ProbeVolumeIntensity = new GUIContent("Probe Shading Intensity");
+
+            internal static readonly GUIContent s_DebugStreaming = new GUIContent("Debug Streaming");
+            internal static readonly GUIContent s_StreamingCamera = new GUIContent("Streaming Camera");
+            internal static readonly GUIContent s_StreamingMemoryBudget = new GUIContent("Memory Budget");
+            internal static readonly GUIContent s_StreamingRadiusScale = new GUIContent("Radius Scale");
             
             internal static readonly Color k_GizmoColorBase = new Color32(137, 222, 144, 255);
             
             internal static readonly Color k_GizmoColorCell = new Color32(50, 255, 255, 255);
 
-            internal static readonly Color k_GizmoColorProbe = new Color32(255, 255, 255, 255);
+            internal static readonly Color k_GizmoColorBoundingSphere = new Color32(255, 155, 100, 255);
+            
+            internal static readonly Color k_GizmoColorBoundingBox = new Color32(255, 255, 0, 255);
 
             internal static readonly Color[] k_BaseHandlesColor = new Color[]
             {
@@ -84,7 +91,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             get
             {
                 if (_ShapeBox == null)
+                {
                     _ShapeBox = new HierarchicalBox(Styles.k_GizmoColorBase, Styles.k_BaseHandlesColor);
+                }
                 return _ShapeBox;
             }
         }
@@ -96,8 +105,38 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             get
             {
                 if (_CellBox == null)
+                {
                     _CellBox = new HierarchicalBox(Styles.k_GizmoColorCell);
+                }
                 return _CellBox;
+            }
+        }
+        
+        private static HierarchicalBox _BoundingBox;
+        
+        static HierarchicalBox s_BoundingBox
+        {
+            get
+            {
+                if (_BoundingBox == null)
+                {
+                    _BoundingBox = new HierarchicalBox(Styles.k_GizmoColorBoundingBox);
+                }
+                return _BoundingBox;
+            }
+        }
+
+        private static HierarchicalSphere _BoundingSphere;
+
+        private static HierarchicalSphere s_BoundingSphere
+        {
+            get
+            {
+                if (_BoundingSphere == null)
+                {
+                    _BoundingSphere = new HierarchicalSphere(Styles.k_GizmoColorBoundingSphere);
+                }
+                return _BoundingSphere;
             }
         }
 
@@ -117,7 +156,12 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         private static float s_ProbeRadius = 0.1f;
         private static bool s_DisplayCell = false;
         private static bool s_DisplayProbe = false;
-        private static ProbeDebug s_DebugDraw = ProbeDebug.Diffuse; 
+        private static bool s_DebugStreaming = false;
+        private static float s_RadiusScale = 0.1f;
+        private static ProbeDebug s_DebugDraw = ProbeDebug.Diffuse;
+
+        private static EasyProbeMetaData s_EasyProbeMetadata;
+        private static bool s_NeedReloadMetadata = true;
         
         public static int GetAdjustedMultiple(int a, int b, int max)
         {
@@ -193,8 +237,27 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             s_DisplayProbe = EditorGUILayout.Toggle(Styles.s_DisplayProbe, s_DisplayProbe);
             if (s_DisplayProbe)
             {
+                EditorGUI.indentLevel++;
                 s_ProbeRadius = EditorGUILayout.Slider(Styles.s_ProbeDrawSize, s_ProbeRadius, 0f, 1f);
                 s_DebugDraw = (ProbeDebug)EditorGUILayout.EnumPopup(Styles.s_ProbeDebugType, s_DebugDraw);
+                EditorGUI.indentLevel--;
+            }
+            
+
+            s_DebugStreaming = EditorGUILayout.Toggle(Styles.s_DebugStreaming, s_DebugStreaming);
+            if (s_DebugStreaming)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(serialized.streamingCamera, Styles.s_StreamingCamera);
+                s_RadiusScale = EditorGUILayout.Slider(Styles.s_StreamingRadiusScale, s_RadiusScale, 0.01f, 1.0f);
+                if (EasyProbeSetup.Instance != null)
+                {
+                    EasyProbeSetup.Instance.settings.budget =
+                        (EasyProbeSetup.MemoryBudget)EditorGUILayout.EnumPopup(
+                            Styles.s_StreamingMemoryBudget,
+                            EasyProbeSetup.Instance.settings.budget);
+                }
+                EditorGUI.indentLevel--;
             }
             
             EditorGUILayout.Space();
@@ -215,15 +278,16 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 CheckCollider();
             }
             
-            EditorGUILayout.Space();
-            if (GUILayout.Button("Place Probes"))
-            {
-                EasyProbeBaking.PlaceProbes();
-            }
+            // EditorGUILayout.Space();
+            // if (GUILayout.Button("Place Probes"))
+            // {
+            //     EasyProbeBaking.PlaceProbes();
+            // }
             
             EditorGUILayout.Space();
             if (GUILayout.Button("Bake"))
             {
+                s_NeedReloadMetadata = true;
                 s_LightSources.Clear();
                 s_Lights.Clear();
                 pv.lightRoot.GetComponentsInChildren(s_Lights);
@@ -239,6 +303,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                         new Bounds(light.transform.position, new Vector3(light.range, light.range, light.range)),
                         light));
                 }
+                
                 EasyProbeBaking.Bake(s_LightSources, (int)m_SampleCount);
             }
         }
@@ -285,7 +350,38 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             }
             
         }
-        
+
+        static void DrawCell(Vector3Int cellBoxMin, Vector3Int cellBoxMax)
+        {
+            using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity,
+                       Vector3.one)))
+            {
+                var step = s_EasyProbeMetadata.cellSize;
+                for (int x = cellBoxMin.x; x < cellBoxMax.x; x+=step)
+                {
+                    for (int y = cellBoxMin.y; y < cellBoxMax.y; y+=step)
+                    {
+                        for (int z = cellBoxMin.z; z < cellBoxMax.z; z+=step)
+                        {
+                            var position = new Vector3Int(
+                                x  + step / 2,
+                                y  + step / 2,
+                                z  + step / 2
+                            );
+                                       
+                            s_CellBox.center = position;
+                            s_CellBox.size = new Vector3(
+                                s_EasyProbeMetadata.cellSize,
+                                s_EasyProbeMetadata.cellSize,
+                                s_EasyProbeMetadata.cellSize
+                            );
+                            s_CellBox.DrawHull(false);
+                                       
+                        }
+                    }
+                }
+            }
+        }
         
         [DrawGizmo(GizmoType.InSelectionHierarchy)]
         static void DrawGizmosSelected(EasyProbeVolume probeVolume, GizmoType gizmoType)
@@ -299,27 +395,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             }
             
             {
-                // Draw Cell
-                if (s_DisplayCell)
-                {
-                    foreach (var cell in EasyProbeBaking.s_ProbeCells)
-                    {
-                        using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one)))
-                        {
-                            // Bounding box.
-                            s_CellBox.center = cell.position;
-                            s_CellBox.size = new Vector3(
-                                cell.size,
-                                cell.size,
-                                cell.size
-                            );
-                            s_CellBox.DrawHull(EditMode.editMode == k_EditShape);
-                        }
-                    }
-                }
-            }
-
-            {
                 // Draw Probe
                 if (s_DisplayProbe)
                 {
@@ -330,6 +405,76 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                             s_ProbeSphere.center = probe.position;
                             s_ProbeSphere.radius = s_ProbeRadius;
                             s_ProbeSphere.DrawProbe(probe, probeVolume, s_DebugDraw);
+                        }
+                    }
+                }
+            }
+
+            {
+                // Display Cell
+                if (s_DisplayCell)
+                {
+                    if (s_NeedReloadMetadata)
+                    {
+                        if (EasyProbeStreaming.LoadMetadata(ref s_EasyProbeMetadata))
+                        {
+                            s_NeedReloadMetadata = false;
+                        }
+                    }
+                }
+            }
+            
+            {
+                // Draw Streaming Cell
+                if (s_DebugStreaming && probeVolume.streamingCamera != null && EasyProbeSetup.Instance != null)
+                {
+                    float radius = 0;
+                    switch (EasyProbeSetup.Instance.settings.budget)
+                    {
+                        case EasyProbeSetup.MemoryBudget.Low:
+                            radius = EasyProbeSetup.k_BoundingRadiusLow;
+                            break;
+                        case EasyProbeSetup.MemoryBudget.Medium:
+                            radius = EasyProbeSetup.k_BoundingRadiusMedium;
+                            break;
+                        case EasyProbeSetup.MemoryBudget.High:
+                            radius = EasyProbeSetup.k_BoundingRadiusHigh;
+                            break;
+                    }
+                    var boundingSphere = 
+                        EasyProbeStreaming.CalculateCameraFrustumSphere(probeVolume.streamingCamera, radius * s_RadiusScale);
+                    var sphereAABB = EasyProbeStreaming.CalculateSphereAABB(boundingSphere);
+
+                    using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one)))
+                    {
+                        s_BoundingSphere.radius = boundingSphere.w;
+                        s_BoundingSphere.center = new Vector3(boundingSphere.x, boundingSphere.y, boundingSphere.z);
+                        s_BoundingSphere.DrawHull(false);
+
+                        s_BoundingBox.center = sphereAABB.center;
+                        s_BoundingBox.size = sphereAABB.size;
+                        s_BoundingBox.DrawHull(false);
+
+                    }
+
+                    {
+                        // Draw Streaming Cells
+                        if (s_DisplayCell && !s_NeedReloadMetadata)
+                        {
+                            EasyProbeStreaming.StreamingCells(sphereAABB, out var cellBoxMin, out var cellBoxMax
+                                , out var _, out var _);
+                            DrawCell(cellBoxMin, cellBoxMax);
+                        }
+                    }
+
+                }
+                else
+                {
+                    {
+                        // Draw All Cells
+                        if (s_DisplayCell && !s_NeedReloadMetadata)
+                        {
+                            DrawCell(s_EasyProbeMetadata.cellMin, s_EasyProbeMetadata.cellMax);
                         }
                     }
                 }

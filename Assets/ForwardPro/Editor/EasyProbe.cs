@@ -7,7 +7,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         // L2
         public static int s_CoefficientCount = 27;
         
-        public List<int> cells = new ();
+        public List<EasyProbeCell> cells = new ();
         public Vector3Int position;
        
         public List<float> coefficients = new();

@@ -14,15 +14,28 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             L2
         }
 
+        public enum MemoryBudget
+        {
+            Low,
+            Medium,
+            High
+        }
+
+        public static int k_BoundingRadiusLow = 50;
+        public static int k_BoundingRadiusMedium = 100;
+        public static int k_BoundingRadiusHigh = 150;
+
         [Serializable]
         public class EasyProbeSettings
         {
             public SHBand band;
+            public MemoryBudget budget;
         }
 
         class EasyProbeSetupPass : ScriptableRenderPass
         {
 
+            public EasyProbeSettings settings;
 
             // This method is called before executing the render pass.
             // It can be used to configure render targets and their clear state. Also to create temporary render target textures.
@@ -39,7 +52,18 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             // You don't have to call ScriptableRenderContext.submit, the render pipeline will call it at specific points in the pipeline.
             public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
             {
-                EasyProbeStreaming.UpdateCellStreaming(context, ref renderingData);
+                switch (settings.budget)
+                {
+                    case MemoryBudget.Low:
+                        EasyProbeStreaming.UpdateCellStreaming(context, ref renderingData, settings, k_BoundingRadiusLow);
+                        break;
+                    case MemoryBudget.Medium:
+                        EasyProbeStreaming.UpdateCellStreaming(context, ref renderingData, settings, k_BoundingRadiusMedium);
+                        break;
+                    case MemoryBudget.High:
+                        EasyProbeStreaming.UpdateCellStreaming(context, ref renderingData, settings, k_BoundingRadiusHigh);
+                        break;
+                }
             }
 
             // Cleanup any allocated resources that were created during the execution of this render pass.
@@ -50,14 +74,14 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
         EasyProbeSetupPass m_ScriptablePass;
 
-        public EasyProbeSettings m_Settings;
+        public EasyProbeSettings settings = new EasyProbeSettings();
 
         /// <inheritdoc/>
         public override void Create()
         {
             s_Instance = this;
             m_ScriptablePass = new EasyProbeSetupPass();
-
+            m_ScriptablePass.settings = settings;
             // Configures where the render pass should be injected.
             m_ScriptablePass.renderPassEvent = RenderPassEvent.BeforeRendering;
         }

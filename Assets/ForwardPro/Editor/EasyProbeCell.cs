@@ -5,7 +5,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 {
     public class EasyProbeCell : IEquatable<EasyProbeCell>
     {
-        public int index;
         public Vector3Int position = Vector3Int.zero;
         public int size = 0;
         public bool Equals(EasyProbeCell other)

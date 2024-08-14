@@ -13,7 +13,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         private static string s_CurrentOutputRoot = "";
         private static HashSet<Vector3Int> s_TempProbeCellTags = new();
         private static Dictionary<Vector3Int, int> s_TempProbeTags = new();
-        private static List<EasyCellMetaData> s_TempCellMetadata = new();
+        private static List<EasyCellData> s_TempCellMetadata = new();
 
         public static List<EasyProbe> s_Probes = new();
         public static List<EasyProbeCell> s_ProbeCells = new();
@@ -57,9 +57,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
         static bool NeedBake(EasyProbe probe, EasyProbeLightSource lightSource)
         {
-            foreach (var cellIndex in probe.cells)
+            foreach (var cell in probe.cells)
             {
-                var cell = s_ProbeCells[cellIndex];
                 if (lightSource.IntersectCell(cell))
                 {
                     return true;
@@ -288,13 +287,12 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             {
                 var metadata = new EasyProbeMetaData()
                 {
-                    cellMaxAndCellSize = new Vector4(cellMax.x, cellMax.y, cellMax.z, s_ProbeCellSize),
-                    cellMinAndSpacing = new Vector4(cellMin.x, cellMin.y, cellMin.z, s_ProbeSpacing),
-                    probeCount = new Vector4(
-                        probeCountPerAxis.x,
-                        probeCountPerAxis.y,
-                        probeCountPerAxis.z,
-                        probeCountPerCellAxis)
+                    cellMax = cellMax,
+                    cellMin = cellMin,
+                    probeCountPerCellAxis = probeCountPerCellAxis,
+                    probeSpacing = s_ProbeSpacing,
+                    cellSize = s_ProbeCellSize,
+                    probeCountPerVolumeAxis = new Vector3Int((int)probeCountPerAxis.x, (int)probeCountPerAxis.y, (int)probeCountPerAxis.z)
                 };
 
                 var metadataByte = StructToBytes(metadata);
@@ -369,7 +367,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     // var probeStartPerSlice = cellSlice * probeCountPerSlice;
                     // var probeStartInsideSlice = cellY * probeCountPerAxis.x + cellX * (probeCountPerCellAxis - 1);
                     
-                    s_TempCellMetadata.Add(new EasyCellMetaData()
+                    s_TempCellMetadata.Add(new EasyCellData()
                     {
                         position = new Vector4(
                             cell.position.x,
@@ -410,25 +408,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return s_ProbeCells.Count > 0;
         }
 
-        static Vector3Int GetCellIndexStart(EasyProbeVolume volume)
-        {
-            var index = volume.Min / s_ProbeCellSize;
-            return new Vector3Int(
-                Mathf.FloorToInt(index.x),
-                Mathf.FloorToInt(index.y),
-                Mathf.FloorToInt(index.z)
-            );
-        }
-
-        static Vector3Int GetCellIndexEnd(EasyProbeVolume volume)
-        {
-            var index = volume.Max / s_ProbeCellSize;
-            return new Vector3Int(
-                Mathf.CeilToInt(index.x),
-                Mathf.CeilToInt(index.y),
-                Mathf.CeilToInt(index.z)
-            );
-        }
+        
 
         static void SubdivideCell()
         {
@@ -441,8 +421,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     continue;
                 }
 
-                Vector3Int indexStart = GetCellIndexStart(volume);
-                Vector3Int indexEnd = GetCellIndexEnd(volume);
+                Vector3Int indexStart = EasyProbeStreaming.GetCellIndexStart(volume.Min, s_ProbeCellSize);
+                Vector3Int indexEnd = EasyProbeStreaming.GetCellIndexEnd(volume.Max, s_ProbeCellSize);
 
                 var step = s_ProbeCellSize;
                 for (int x = indexStart.x; x < indexEnd.x; ++x)
@@ -468,7 +448,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                             {
                                 position = position,
                                 size = s_ProbeCellSize,
-                                index = s_ProbeCells.Count
                             };
                             s_ProbeCells.Add(cell);
                         }
@@ -498,13 +477,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                         
                         if (s_TempProbeTags.TryGetValue(position, out var indice))
                         {
-                            s_Probes[indice].cells.Add(cell.index);
+                            s_Probes[indice].cells.Add(cell);
                             continue;
                         }
                         
                         s_TempProbeTags.Add(position, s_Probes.Count);
                         var probe = new EasyProbe(position);
-                        probe.cells.Add(cell.index);
+                        probe.cells.Add(cell);
                         s_Probes.Add(probe);
                     }
                 }

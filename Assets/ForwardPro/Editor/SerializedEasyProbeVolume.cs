@@ -7,6 +7,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         internal SerializedProperty volumeSize;
         
         internal SerializedProperty lightRoot;
+
+        internal SerializedProperty streamingCamera;
         
         internal SerializedObject serializedObject;
 
@@ -17,6 +19,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             volumeSize = serializedObject.FindProperty("volumeSize");
             
             lightRoot = serializedObject.FindProperty("lightRoot");
+
+            streamingCamera = serializedObject.FindProperty("streamingCamera");
+            
         }
 
         internal void Apply()

@@ -76,13 +76,10 @@ float3 SampleEasySH9(half3 N, float3 positionWS, float2 positionSS, float3 direc
 {
 
     positionWS = AddNoiseToSamplingPosition(positionWS, positionSS, direction);
-    
+
+    // TODO: uvw offset
     float3 uvw = ((positionWS - _EasyVolumeWorldOffset) / _EasyProbeVolumeSize).xyz;
 
-    // clip(uvw);
-    // clip(1.0 - uvw + 0.01);
-    // return uvw;
-    
     half4 shAr = half4(SAMPLE_TEXTURE3D_LOD(_EasyProbeSHAr, sampler_EasyProbeSHAr, uvw, 0).rgba);
     half4 shAg = half4(SAMPLE_TEXTURE3D_LOD(_EasyProbeSHAg, sampler_EasyProbeSHAg, uvw, 0).rgba);
     half4 shAb = half4(SAMPLE_TEXTURE3D_LOD(_EasyProbeSHAb, sampler_EasyProbeSHAb, uvw, 0).rgba);

@@ -19,6 +19,11 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
         [HideInInspector] public Transform lightRoot = null;
 
+#if UNITY_EDITOR
+        [HideInInspector] public Camera streamingCamera;
+#endif
+       
+
         public Vector3 Min
         {
             get

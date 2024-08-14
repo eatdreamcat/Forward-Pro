@@ -1,5 +1,6 @@
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using Unity.Collections;
@@ -9,18 +10,22 @@ using UnityEngine.Rendering.Universal;
 
 namespace UnityEngine.Rendering.EasyProbeVolume
 {
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct EasyProbeMetaData
     {
-        public Vector4 cellMinAndSpacing;
-        public Vector4 cellMaxAndCellSize;
+        public Vector3Int cellMin;
+        public int probeSpacing;
+        public Vector3Int cellMax;
+        public int cellSize;
         // xyz: perVolumeAxis, w: perCellAxis
-        public Vector4 probeCount;
+        public Vector3Int probeCountPerVolumeAxis;
+        public int probeCountPerCellAxis;
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    public struct EasyCellMetaData
+    public struct EasyCellData
     {
+        // xyz: cell world position, w: probe count per slice
         public Vector4 position;
         // xyz: volume index, w: flatten index
         public Vector4 cellIndex;
@@ -87,6 +92,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         public static NativeArray<half4> s_SHC;
 
         public static EasyProbeMetaData s_Metadata;
+        public static List<EasyCellData> s_CellDatas = new List<EasyCellData>();
         public static bool s_NeedReloadMetadata = true;
         
         
@@ -97,6 +103,10 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         private static int s_BufferEndIndex;
 
         private static int s_BytesInUse = 0;
+
+        private static FileStream s_FileStream;
+        private static EasyProbeSetup.MemoryBudget s_Budget;
+        private static ProbeVolumeSHBands s_Bands;
         
         static bool AllocBufferDataIfNeeded(ref Texture probeRT, ref NativeArray<half4> sh,
             int width, int height, int depth, string name, bool allocRenderTexture = false)
@@ -134,6 +144,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 format == GraphicsFormat.R8G8B8A8_UNorm ? 4 : 1;
             return (width * height * depth) * elementSize;
         }
+        
+        
         
         public static Texture CreateDataTexture(int width, int height, int depth, GraphicsFormat format, string name, bool allocateRendertexture)
         {
@@ -189,9 +201,10 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return null;
         }
         
-        static bool LoadMetadata()
+        public static bool LoadMetadata(ref EasyProbeMetaData metaData, string volumeHash = "")
         {
             int size = Marshal.SizeOf(typeof(EasyProbeMetaData));
+            // TODO 
             var bytes = ReadByteFromRelativePath(s_MetadataPath);
             if (bytes.Length != size)
             { 
@@ -204,8 +217,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             try
             {
                 Marshal.Copy(bytes, 0, ptr, size);
-                s_Metadata = Marshal.PtrToStructure<EasyProbeMetaData>(ptr);
-                s_NeedReloadMetadata = false;
+                metaData = Marshal.PtrToStructure<EasyProbeMetaData>(ptr);
                 isSuccess = true;
             }
             catch (Exception e)
@@ -220,16 +232,19 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return isSuccess;
         }
         
-        public static void UpdateCellStreaming(ScriptableRenderContext context, ref RenderingData renderingData)
+        public static void UpdateCellStreaming(ScriptableRenderContext context, ref RenderingData renderingData, 
+            EasyProbeSetup.EasyProbeSettings settings, float radius)
         {
             if (s_NeedReloadMetadata)
             {
-                if (!LoadMetadata())
+                if (!LoadMetadata(ref s_Metadata))
                 {
                     Debug.LogError("[EasyProbeStreaming](UpdateCellStreaming): load metadata error.");
                     return;
                 }
-                
+
+                s_NeedReloadMetadata = false;
+
             }
 
             var camera = renderingData.cameraData.camera;
@@ -252,10 +267,10 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
         public static void ProcessStreaming(Camera camera)
         {
-            var cellMin = s_Metadata.cellMinAndSpacing;
-            var cellMax = s_Metadata.cellMaxAndCellSize;
-            var probeSpacing = s_Metadata.cellMinAndSpacing.w;
-            var cellSize = s_Metadata.cellMaxAndCellSize.w;
+            var cellMin = s_Metadata.cellMin;
+            var cellMax = s_Metadata.cellMax;
+            var probeSpacing = s_Metadata.probeSpacing;
+            var cellSize = s_Metadata.cellSize;
             var halfSize = probeSpacing / 2.0f;
             
             s_ProbeVolumeWorldOffset = 
@@ -328,7 +343,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
                 {
                     using var l2Array = new NativeArray<byte>(l2Bytes.Length, Allocator.Temp,
-                        NativeArrayOptions.ClearMemory);
+                        NativeArrayOptions.UninitializedMemory);
                     l2Array.CopyFrom(l2Bytes);
                     var l2HalfArray = l2Array.Slice().SliceConvert<half4>();
                     for (int i = 0; i < l2HalfArray.Length; i+=4)
@@ -342,6 +357,108 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 }
             }
             
+        }
+
+        static Vector3 Max3(Vector3 a, Vector3 b)
+        {
+            return new Vector3(Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y), Mathf.Max(a.z, b.z));
+        }
+
+        static Vector3 Min3(Vector3 a, Vector3 b)
+        {
+            return new Vector3(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Min(a.z, b.z));
+        }
+        
+        static Vector3Int Max3(Vector3Int a, Vector3Int b)
+        {
+            return new Vector3Int(Math.Max(a.x, b.x), Math.Max(a.y, b.y), Math.Max(a.z, b.z));
+        }
+
+        static Vector3Int Min3(Vector3Int a, Vector3Int b)
+        {
+            return new Vector3Int(Math.Min(a.x, b.x), Math.Min(a.y, b.y), Math.Min(a.z, b.z));
+        }
+        
+        public static Vector3Int GetCellIndexStart(Vector3 minPoint, int cellSize)
+        {
+            var index = minPoint / cellSize;
+            return new Vector3Int(
+                Mathf.FloorToInt(index.x),
+                Mathf.FloorToInt(index.y),
+                Mathf.FloorToInt(index.z)
+            );
+        }
+
+        public static Vector3Int GetCellIndexEnd(Vector3 maxPoint, int cellSize)
+        {
+            var index = maxPoint / cellSize;
+            return new Vector3Int(
+                Mathf.CeilToInt(index.x),
+                Mathf.CeilToInt(index.y),
+                Mathf.CeilToInt(index.z)
+            );
+        }
+        
+        public static void StreamingCells(Bounds cameraAABB, 
+            out Vector3Int clampedCellMin, 
+            out Vector3Int clampedCellMax,
+            out Vector3Int boxMin,
+            out Vector3Int boxMax)
+        {
+            int cellSize = s_Metadata.cellSize;
+            var cellMin = s_Metadata.cellMin;
+            var cellMax = s_Metadata.cellMax;
+
+            var boxCenter = GetCellIndexStart(cameraAABB.center, cellSize) * cellSize 
+                            + new Vector3Int(cellSize / 2, cellSize / 2, cellSize / 2);
+            
+            boxMin = GetCellIndexStart(cameraAABB.min, cellSize) * cellSize;
+            boxMax = GetCellIndexEnd(cameraAABB.max, cellSize) * cellSize;
+            var maxExtend = Max3(boxMax - boxCenter, boxCenter - boxMin);
+
+            boxMin = boxCenter - maxExtend;
+            boxMax = boxCenter + maxExtend;
+                
+            clampedCellMin = Max3(boxMin, cellMin);
+            clampedCellMax = Min3(boxMax, cellMax);
+            
+        }
+        
+        
+        public static Bounds CalculateSphereAABB(Vector4 sphere)
+        {
+            return new Bounds(new Vector3(sphere.x, sphere.y, sphere.z), Vector3.one * sphere.w * 2f);
+        }
+        
+        public static Vector4 CalculateCameraFrustumSphere(Camera camera, float radius)
+        {
+            Vector3[] nearCorners = new Vector3[4];
+            
+            camera.CalculateFrustumCorners(new Rect(0, 0, 1, 1), camera.nearClipPlane, Camera.MonoOrStereoscopicEye.Mono, nearCorners);
+            
+            for (int i = 0; i < 4; i++)
+            {
+                nearCorners[i] = camera.transform.TransformPoint(nearCorners[i]);
+            }
+            
+            Vector3 centerOfNearPlane = Vector3.zero;
+
+            foreach (var corner in nearCorners)
+            {
+                centerOfNearPlane += corner;
+            }
+
+            centerOfNearPlane /= 4;
+
+            var distanceFromTopLeftNearCorner = Vector3.Distance(centerOfNearPlane, nearCorners[0]);
+
+            radius = Mathf.Max(radius, distanceFromTopLeftNearCorner * 1.4142135623730951f);
+            
+            var distanceFromNearCenter = Mathf.Sqrt(radius * radius - distanceFromTopLeftNearCorner * distanceFromTopLeftNearCorner);
+            Vector3 center = Vector3.zero;
+            center = centerOfNearPlane + camera.transform.forward * distanceFromNearCenter;
+            
+            return new Vector4(center.x, center.y, center.z, radius);
         }
         
         public static void UploadTextureData()
@@ -442,6 +559,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             }
 
             s_NeedReloadMetadata = true;
+            
+            s_FileStream?.Dispose();
+            
         }
     }
 
