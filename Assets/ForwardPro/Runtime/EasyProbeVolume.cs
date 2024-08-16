@@ -10,7 +10,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
     {
         // TODO: move to renderfeature
         public static float s_EasyPVSamplingNoise = 0.0f;
-        public static float s_EasyProbeIntensity = 1.0f;
+        public static float s_EasyProbeIntensity = 5.0f;
         
         public static List<EasyProbeVolume> s_ProbeVolumes = new();
         private List<Light> m_Lights = new();

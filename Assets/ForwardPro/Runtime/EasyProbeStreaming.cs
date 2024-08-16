@@ -129,9 +129,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             
         private static EasyProbeSetup.MemoryBudget s_Budget;
         private static ProbeVolumeSHBands s_Bands;
-
-        // private const int k_L0L1Stride = 8 * 3;
-        // private const int k_L2Stride = 8 * 4;
+        
         private const int k_BytesPerHalf4 = 8;
         
         struct FileStreamKey
@@ -411,7 +409,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             var halfProbeSpacing = s_Metadata.probeSpacing / 2f;
             s_ProbeVolumeWorldOffset = new Vector4(boxMinWS.x - halfProbeSpacing, boxMinWS.y - halfProbeSpacing, boxMinWS.z - halfProbeSpacing, 1.0f);
 
-            int l0l1TotalSize = 0;
+            int l0l1TotalSizePerComponent = 0;
             s_SHArRequests.Clear();
             s_SHAgRequests.Clear();
             s_SHAbRequests.Clear();
@@ -427,7 +425,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             var l0l1ProbeDataLineLength = probeCountPerAxis.x * k_BytesPerHalf4;
             
             var cellOffset = (clampedCellMinWS - s_Metadata.cellMin) / s_Metadata.cellSize;
-            var probeStartAtX = cellOffset.x * (s_Metadata.probeCountPerCellAxis - 1)
+            var probeIndexStart = cellOffset.x * (s_Metadata.probeCountPerCellAxis - 1)
                                 + cellOffset.y * s_Metadata.probeCountPerVolumeAxis.x
                                 + cellOffset.z * probeCountPerSlice;
 
@@ -437,19 +435,21 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             {
                 for (int line = 0; line < probeCountPerAxis.y; ++line)
                 {
-                    var l0l1ProbeDataLineStart = (probeStartAtX + slice * probeCountPerSlice + line * probeCountPerAxis.x) * k_BytesPerHalf4;
+                    var l0l1ProbeDataLineStart = (probeIndexStart 
+                                                  + slice * probeCountPerSlice
+                                                  + line * s_Metadata.probeCountPerVolumeAxis.x) * k_BytesPerHalf4;
                     var request = new ProbeStreamingRequest()
                     {
                         fileOffset = l0l1ProbeDataLineStart,
                         length = l0l1ProbeDataLineLength,
-                        bufferOffset = l0l1TotalSize
+                        bufferOffset = l0l1TotalSizePerComponent
                     };
                     s_SHArRequests.Add(request);
                     request.fileOffset += totalProbeCount * k_BytesPerHalf4;
                     s_SHAgRequests.Add(request);
                     request.fileOffset += totalProbeCount * k_BytesPerHalf4;
                     s_SHAbRequests.Add(request);
-                    l0l1TotalSize += l0l1ProbeDataLineLength;
+                    l0l1TotalSizePerComponent += l0l1ProbeDataLineLength;
                 }
             }
 
@@ -780,16 +780,16 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             var cellMin = s_Metadata.cellMin;
             var cellMax = s_Metadata.cellMax;
 
-            {
-                cellMax -= s_Metadata.cellSize * Vector3Int.one * 10;
-                // test
-                boxMaxWS = cellMax;
-                boxMinWS = cellMin;
-
-                clampedCellMinWS = cellMin;
-                clampedCellMaxWS = cellMax;
-                return;
-            }
+            // {
+            //     cellMax -= s_Metadata.cellSize * Vector3Int.one * 20;
+            //     // test
+            //     boxMaxWS = cellMax;
+            //     boxMinWS = cellMin;
+            //
+            //     clampedCellMinWS = cellMin;
+            //     clampedCellMaxWS = cellMax;
+            //     return;
+            // }
             
             var boxCenter = GetCellIndexStart(cameraAABB.center, cellSize) * cellSize 
                             + new Vector3Int(cellSize / 2, cellSize / 2, cellSize / 2);
