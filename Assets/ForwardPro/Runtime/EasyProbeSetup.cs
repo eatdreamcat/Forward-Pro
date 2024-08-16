@@ -31,7 +31,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         {
             public SHBand band;
             public MemoryBudget budget;
-            // test
             public bool enableStreaming;
         }
 

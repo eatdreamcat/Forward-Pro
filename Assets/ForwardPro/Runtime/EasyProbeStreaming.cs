@@ -37,7 +37,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         // public Vector4 probeDataSliceLayout;
     }
 
-    public struct ProbeBytesStreaming
+    public struct ProbeStreamingRequest
     {
         public int fileOffset;
         public int length;
@@ -116,14 +116,14 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
         private static int s_BytesInUse = 0;
 
-        private static List<ProbeBytesStreaming> s_SHArRequests = new();
-        private static List<ProbeBytesStreaming> s_SHAgRequests = new();
-        private static List<ProbeBytesStreaming> s_SHAbRequests = new();
+        private static List<ProbeStreamingRequest> s_SHArRequests = new();
+        private static List<ProbeStreamingRequest> s_SHAgRequests = new();
+        private static List<ProbeStreamingRequest> s_SHAbRequests = new();
         
-        private static List<ProbeBytesStreaming> s_SHBrRequests = new();
-        private static List<ProbeBytesStreaming> s_SHBgRequests = new();
-        private static List<ProbeBytesStreaming> s_SHBbRequests = new();
-        private static List<ProbeBytesStreaming> s_SHCRequests = new();
+        private static List<ProbeStreamingRequest> s_SHBrRequests = new();
+        private static List<ProbeStreamingRequest> s_SHBgRequests = new();
+        private static List<ProbeStreamingRequest> s_SHBbRequests = new();
+        private static List<ProbeStreamingRequest> s_SHCRequests = new();
         
         private static bool s_EnableStreaming = false;
             
@@ -261,7 +261,12 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 #if UNITY_EDITOR || ENABLE_PROFILER
                 Profiler.BeginSample(ProfilerSampler.s_FileStreamRead);
 #endif
-                fs.Read(buffer, bufferOffset, length);
+                var size = fs.Read(buffer, bufferOffset, length);
+
+                if (size != length)
+                {
+                    
+                }
                
 #if UNITY_EDITOR || ENABLE_PROFILER
                 Profiler.EndSample();
@@ -378,15 +383,14 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return fileStream;
         }
 
-        static bool LoadSHBytes(FileStream fileStream, string filePath, List<ProbeBytesStreaming> requests, ref byte[] buffer)
+        static bool LoadSHBytes(FileStream fileStream, List<ProbeStreamingRequest> requests, ref byte[] buffer)
         {
-            // fileStream.Position = requests[0].fileOffset;
             for (int i = 0; i < requests.Count; ++i)
             {
                 var request = requests[i];
                 if (!ReadBytesFromRelativePath(fileStream, ref buffer, request.bufferOffset, request.fileOffset, request.length))
                 {
-                    Debug.LogError($"[EasyProbeStreaming](ProcessStreaming): failed to load sh data {filePath} at offset {request.fileOffset}");
+                    Debug.LogError($"[EasyProbeStreaming](ProcessStreaming): failed to load sh data {fileStream.Name} at offset {request.fileOffset}");
                     return false;
                 }
             }
@@ -402,7 +406,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             var cameraAABB = CalculateSphereAABB(CalculateCameraFrustumSphere(ref s_Metadata, camera, radius));
             CalculateCellRange(cameraAABB, out var clampedCellMinWS, out var clampedCellMaxWS,
                 out var boxMinWS, out var boxMaxWS);
-            
+
             s_ProbeVolumeSize = boxMaxWS - boxMinWS + s_Metadata.probeSpacing * Vector3Int.one;
             var halfProbeSpacing = s_Metadata.probeSpacing / 2f;
             s_ProbeVolumeWorldOffset = new Vector4(boxMinWS.x - halfProbeSpacing, boxMinWS.y - halfProbeSpacing, boxMinWS.z - halfProbeSpacing, 1.0f);
@@ -434,7 +438,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 for (int line = 0; line < probeCountPerAxis.y; ++line)
                 {
                     var l0l1ProbeDataLineStart = (probeStartAtX + slice * probeCountPerSlice + line * probeCountPerAxis.x) * k_BytesPerHalf4;
-                    var request = new ProbeBytesStreaming()
+                    var request = new ProbeStreamingRequest()
                     {
                         fileOffset = l0l1ProbeDataLineStart,
                         length = l0l1ProbeDataLineLength,
@@ -507,17 +511,18 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             var filePath = currentScenePath + s_L0L1DataPath;
 
             var fileStream = GetFileStream(filePath, FileMode.Open, FileAccess.Read);
-            if (!LoadSHBytes(fileStream, filePath, s_SHArRequests, ref s_SHAr))
+          
+            if (!LoadSHBytes(fileStream, s_SHArRequests, ref s_SHAr))
             {
                 return false;
             }
             
-            if (!LoadSHBytes(fileStream, filePath, s_SHAgRequests, ref s_SHAg))
+            if (!LoadSHBytes(fileStream, s_SHAgRequests, ref s_SHAg))
             {
                 return false;
             }
             
-            if (!LoadSHBytes(fileStream, filePath, s_SHAbRequests, ref s_SHAb))
+            if (!LoadSHBytes(fileStream, s_SHAbRequests, ref s_SHAb))
             {
                 return false;
             }
@@ -543,7 +548,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             var cellMax = s_Metadata.cellMax;
             var probeSpacing = s_Metadata.probeSpacing;
             var halfSize = probeSpacing / 2.0f;
-            
+
+            var globalProbeCountInTotal = s_Metadata.probeCountPerVolumeAxis.x * s_Metadata.probeCountPerVolumeAxis.y *
+                                          s_Metadata.probeCountPerVolumeAxis.z;
             s_ProbeVolumeWorldOffset = 
                 new Vector4(cellMin.x - halfSize, cellMin.y - halfSize, cellMin.z - halfSize, 1.0f);
             s_ProbeVolumeSize = cellMax - cellMin;
@@ -579,8 +586,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             
             if (hasAlloc)
             {
-                var totalProbeCount = width * height * depth;
-                var offsetPerComponent = totalProbeCount * k_BytesPerHalf4;
+                var totalProbeCountToLoad = width * height * depth;
+                var bytesToLoad = totalProbeCountToLoad * k_BytesPerHalf4;
+                var fileOffsetPerComponent = globalProbeCountInTotal * k_BytesPerHalf4;
                 
                 var currentScenePath = SceneManagement.SceneManager.GetActiveScene().path;
                 var lastIndexOfSep = currentScenePath.LastIndexOf("/");
@@ -589,13 +597,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 // L0L1
                 var filePath = currentScenePath + s_L0L1DataPath;
                 var fileStream = GetFileStream(filePath, FileMode.Open, FileAccess.Read);
-                if (!LoadSHBytes(fileStream, filePath, new List<ProbeBytesStreaming>()
+                if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
                     {
-                        new ProbeBytesStreaming()
+                        new ProbeStreamingRequest()
                         {
                             bufferOffset = 0,
                             fileOffset = 0,
-                            length = offsetPerComponent
+                            length = bytesToLoad
                         }
                     }, ref s_SHAr))
                 {
@@ -603,13 +611,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     return false;
                 }
                 
-                if (!LoadSHBytes(fileStream, filePath, new List<ProbeBytesStreaming>()
+                if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
                     {
-                        new ProbeBytesStreaming()
+                        new ProbeStreamingRequest()
                         {
                             bufferOffset = 0,
-                            fileOffset = offsetPerComponent,
-                            length = offsetPerComponent
+                            fileOffset = fileOffsetPerComponent,
+                            length = bytesToLoad
                         }
                     }, ref s_SHAg))
                 {
@@ -617,13 +625,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     return false;
                 }
                 
-                if (!LoadSHBytes(fileStream, filePath, new List<ProbeBytesStreaming>()
+                if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
                     {
-                        new ProbeBytesStreaming()
+                        new ProbeStreamingRequest()
                         {
                             bufferOffset = 0,
-                            fileOffset = offsetPerComponent * 2,
-                            length = offsetPerComponent 
+                            fileOffset = fileOffsetPerComponent * 2,
+                            length = bytesToLoad 
                         }
                     }, ref s_SHAb))
                 {
@@ -634,13 +642,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 // L2
                 filePath = currentScenePath + s_L2DataPath;
                 fileStream = GetFileStream(filePath, FileMode.Open, FileAccess.Read);
-                if (!LoadSHBytes(fileStream, filePath, new List<ProbeBytesStreaming>()
+                if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
                     {
-                        new ProbeBytesStreaming()
+                        new ProbeStreamingRequest()
                         {
                             bufferOffset = 0,
                             fileOffset = 0,
-                            length = offsetPerComponent
+                            length = bytesToLoad
                         }
                     }, ref s_SHBr))
                 {
@@ -648,13 +656,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     return false;
                 }
                 
-                if (!LoadSHBytes(fileStream, filePath, new List<ProbeBytesStreaming>()
+                if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
                     {
-                        new ProbeBytesStreaming()
+                        new ProbeStreamingRequest()
                         {
                             bufferOffset = 0,
-                            fileOffset = offsetPerComponent,
-                            length = offsetPerComponent
+                            fileOffset = fileOffsetPerComponent,
+                            length = bytesToLoad
                         }
                     }, ref s_SHBg))
                 {
@@ -662,13 +670,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     return false;
                 }
                 
-                if (!LoadSHBytes(fileStream, filePath, new List<ProbeBytesStreaming>()
+                if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
                     {
-                        new ProbeBytesStreaming()
+                        new ProbeStreamingRequest()
                         {
                             bufferOffset = 0,
-                            fileOffset = offsetPerComponent * 2,
-                            length = offsetPerComponent 
+                            fileOffset = fileOffsetPerComponent * 2,
+                            length = bytesToLoad 
                         }
                     }, ref s_SHBb))
                 {
@@ -676,13 +684,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     return false;
                 }
                 
-                if (!LoadSHBytes(fileStream, filePath, new List<ProbeBytesStreaming>()
+                if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
                     {
-                        new ProbeBytesStreaming()
+                        new ProbeStreamingRequest()
                         {
                             bufferOffset = 0,
-                            fileOffset = offsetPerComponent * 3,
-                            length = offsetPerComponent 
+                            fileOffset = fileOffsetPerComponent * 3,
+                            length = bytesToLoad 
                         }
                     }, ref s_SHC))
                 {
@@ -696,6 +704,11 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         
         public static bool ProcessStreaming(Camera camera, float radius)
         {
+            if (camera.cameraType == CameraType.Preview || camera.cameraType == CameraType.Reflection)
+            {
+                return false;
+            }
+            
             if (EasyProbeSetup.Instance != null)
             {
                 if (s_EnableStreaming != EasyProbeSetup.Instance.settings.enableStreaming)
@@ -767,6 +780,17 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             var cellMin = s_Metadata.cellMin;
             var cellMax = s_Metadata.cellMax;
 
+            {
+                cellMax -= s_Metadata.cellSize * Vector3Int.one * 10;
+                // test
+                boxMaxWS = cellMax;
+                boxMinWS = cellMin;
+
+                clampedCellMinWS = cellMin;
+                clampedCellMaxWS = cellMax;
+                return;
+            }
+            
             var boxCenter = GetCellIndexStart(cameraAABB.center, cellSize) * cellSize 
                             + new Vector3Int(cellSize / 2, cellSize / 2, cellSize / 2);
             

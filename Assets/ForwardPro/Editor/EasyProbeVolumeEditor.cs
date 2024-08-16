@@ -48,6 +48,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             
             internal static readonly Color k_GizmoColorBoundingBox = new Color32(255, 255, 0, 255);
             internal static readonly Color k_GizmoColorActualVolumeBox = new Color32(255, 0, 0, 255);
+            internal static readonly Color k_GizmoColorValidVolumeBox = new Color32(50, 50, 255, 255);
 
             internal static readonly Color[] k_BaseHandlesColor = new Color[]
             {
@@ -139,6 +140,20 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     _VolumeBox = new HierarchicalBox(Styles.k_GizmoColorActualVolumeBox);
                 }
                 return _VolumeBox;
+            }
+        }
+        
+        private static HierarchicalBox _ValidVolumeBox;
+        
+        static HierarchicalBox s_ValidVolumeBox
+        {
+            get
+            {
+                if (_ValidVolumeBox == null)
+                {
+                    _ValidVolumeBox = new HierarchicalBox(Styles.k_GizmoColorValidVolumeBox);
+                }
+                return _ValidVolumeBox;
             }
         }
 
@@ -237,7 +252,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 EasyProbeVolume.s_EasyPVSamplingNoise, 0.0f, 1.0f);
             EasyProbeVolume.s_EasyProbeIntensity = EditorGUILayout.Slider(Styles.s_ProbeVolumeIntensity,
                 EasyProbeVolume.s_EasyProbeIntensity,
-                0.0f, 1.0f);
+                0.0f, 5.0f);
             
             EditorGUILayout.Space();
 
