@@ -101,7 +101,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 {
                     if (NeedBake(probe, lightSource))
                     {
-                        EasyProbeBakingUtils.BakeProbe(lightSource.light, probe, sampleCount);
+                        EasyProbeBakingUtils.BakeProbe(lightSource, probe, sampleCount);
                     }
                 }
             }

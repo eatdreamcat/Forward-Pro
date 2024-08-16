@@ -12,10 +12,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         
         public Light light => m_Light;
 
-        public EasyProbeLightSource(Bounds bounds, Light light)
+        public bool isRandomColor;
+
+        public EasyProbeLightSource(Bounds bounds, Light light, bool isRandomColor)
         {
             m_Bounds = bounds;
             m_Light = light;
+            this.isRandomColor = isRandomColor;
         }
         
         public bool IntersectCell(EasyProbeCell cell)
