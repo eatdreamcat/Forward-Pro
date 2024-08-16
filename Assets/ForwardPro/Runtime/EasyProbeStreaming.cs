@@ -406,8 +406,14 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 out var boxMinWS, out var boxMaxWS);
 
             s_ProbeVolumeSize = boxMaxWS - boxMinWS + s_Metadata.probeSpacing * Vector3Int.one;
+            var originOffset = clampedCellMinWS - boxMinWS;
             var halfProbeSpacing = s_Metadata.probeSpacing / 2f;
-            s_ProbeVolumeWorldOffset = new Vector4(boxMinWS.x - halfProbeSpacing, boxMinWS.y - halfProbeSpacing, boxMinWS.z - halfProbeSpacing, 1.0f);
+            s_ProbeVolumeWorldOffset = new Vector4(
+                boxMinWS.x - halfProbeSpacing + originOffset.x, 
+                boxMinWS.y - halfProbeSpacing + originOffset.y,
+                boxMinWS.z - halfProbeSpacing + originOffset.z, 
+                1.0f);
+            
 
             int l0l1TotalSizePerComponent = 0;
             s_SHArRequests.Clear();
@@ -453,7 +459,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 }
             }
 
-            
+            var a = l0l1TotalSizePerComponent;
             #region Calculate Buffer Size
 
             var size = CalculateBufferSize(ref s_Metadata, boxMinWS, boxMaxWS);
