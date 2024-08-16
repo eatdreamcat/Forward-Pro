@@ -23,6 +23,14 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         public static float s_PointAttenConstantK = 0.1f;
         public static int s_MaxProbeSpacing = 10;
         public static int s_MaxProbeCellSize = 30;
+
+        private static NativeArray<half4> s_SHAr; 
+        private static NativeArray<half4> s_SHAg; 
+        private static NativeArray<half4> s_SHAb; 
+        private static NativeArray<half4> s_SHBr; 
+        private static NativeArray<half4> s_SHBg; 
+        private static NativeArray<half4> s_SHBb; 
+        private static NativeArray<half4> s_SHC; 
         
         public static void PlaceProbes()
         {
@@ -160,57 +168,57 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 var l1r0 = (half)probe.coefficients[3];
                 var l1r1 = (half)probe.coefficients[6];
                 var l1r2 = (half)probe.coefficients[9];
-                EasyProbeStreaming.s_SHAr[i] = new half4(l1r0, l1r1, l1r2, l0r);
+                s_SHAr[i] = new half4(l1r0, l1r1, l1r2, l0r);
                 var l0g = (half)probe.coefficients[1];
                 var l1g0 = (half)probe.coefficients[4];
                 var l1g1 = (half)probe.coefficients[7];
                 var l1g2 = (half)probe.coefficients[10];
-                EasyProbeStreaming.s_SHAg[i] = new half4(l1g0, l1g1, l1g2, l0g);
+                s_SHAg[i] = new half4(l1g0, l1g1, l1g2, l0g);
                 var l0b = (half)probe.coefficients[2];
                 var l1b0 = (half)probe.coefficients[5];
                 var l1b1 = (half)probe.coefficients[8];
                 var l1b2 = (half)probe.coefficients[11];
-                EasyProbeStreaming.s_SHAb[i] = new half4(l1b0, l1b1, l1b2, l0b);
+                s_SHAb[i] = new half4(l1b0, l1b1, l1b2, l0b);
                 // l2
                 var l2_1thxyr = (half)probe.coefficients[12];
                 var l2_1thyzr = (half)probe.coefficients[15];
                 var l2_1thzzr = (half)probe.coefficients[18];
                 var l2_1thzxr = (half)probe.coefficients[21];
-                EasyProbeStreaming.s_SHBr[i] = new half4(l2_1thxyr, l2_1thyzr, l2_1thzzr, l2_1thzxr);
+                s_SHBr[i] = new half4(l2_1thxyr, l2_1thyzr, l2_1thzzr, l2_1thzxr);
                 var l2_1thxyg = (half)probe.coefficients[13];
                 var l2_1thyzg = (half)probe.coefficients[16];
                 var l2_1thzzg = (half)probe.coefficients[19];
                 var l2_1thzxg = (half)probe.coefficients[22];
-                EasyProbeStreaming.s_SHBg[i] = new half4(l2_1thxyg, l2_1thyzg, l2_1thzzg, l2_1thzxg);
+                s_SHBg[i] = new half4(l2_1thxyg, l2_1thyzg, l2_1thzzg, l2_1thzxg);
                 var l2_1thxyb = (half)probe.coefficients[14];
                 var l2_1thyzb = (half)probe.coefficients[17];
                 var l2_1thzzb = (half)probe.coefficients[20];
                 var l2_1thzxb = (half)probe.coefficients[23];
-                EasyProbeStreaming.s_SHBb[i] = new half4(l2_1thxyb, l2_1thyzb, l2_1thzzb, l2_1thzxb);
+                s_SHBb[i] = new half4(l2_1thxyb, l2_1thyzb, l2_1thzzb, l2_1thzxb);
                 var l2_5thr = (half)probe.coefficients[24];
                 var l2_5thg = (half)probe.coefficients[25];
                 var l2_5thb = (half)probe.coefficients[26];
                 
-                EasyProbeStreaming.s_SHC[i] = new half4(l2_5thr, l2_5thg, l2_5thb,(half)1.0f);
+                s_SHC[i] = new half4(l2_5thr, l2_5thg, l2_5thb,(half)1.0f);
             }
             
         }
 
         static void AllocTempBufferData(int width, int height, int depth)
         {
-            EasyProbeStreaming.s_SHAr = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            s_SHAr = new NativeArray<half4>(width * height * depth, Allocator.Temp,
                 NativeArrayOptions.UninitializedMemory);
-            EasyProbeStreaming.s_SHAg = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            s_SHAg = new NativeArray<half4>(width * height * depth, Allocator.Temp,
                 NativeArrayOptions.UninitializedMemory);
-            EasyProbeStreaming.s_SHAb = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            s_SHAb = new NativeArray<half4>(width * height * depth, Allocator.Temp,
                             NativeArrayOptions.UninitializedMemory);
-            EasyProbeStreaming.s_SHBr = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            s_SHBr = new NativeArray<half4>(width * height * depth, Allocator.Temp,
                 NativeArrayOptions.UninitializedMemory);
-            EasyProbeStreaming.s_SHBg = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            s_SHBg = new NativeArray<half4>(width * height * depth, Allocator.Temp,
                 NativeArrayOptions.UninitializedMemory);
-            EasyProbeStreaming.s_SHBb = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            s_SHBb = new NativeArray<half4>(width * height * depth, Allocator.Temp,
                 NativeArrayOptions.UninitializedMemory);
-            EasyProbeStreaming.s_SHC = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            s_SHC = new NativeArray<half4>(width * height * depth, Allocator.Temp,
                 NativeArrayOptions.UninitializedMemory);
         }
         
@@ -292,7 +300,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     probeCountPerCellAxis = probeCountPerCellAxis,
                     probeSpacing = s_ProbeSpacing,
                     cellSize = s_ProbeCellSize,
-                    probeCountPerVolumeAxis = new Vector3Int((int)probeCountPerAxis.x, (int)probeCountPerAxis.y, (int)probeCountPerAxis.z)
+                    probeCountPerVolumeAxis = new Vector3Int((int)probeCountPerAxis.x, (int)probeCountPerAxis.y, (int)probeCountPerAxis.z),
                 };
 
                 var metadataByte = StructToBytes(metadata);
@@ -302,18 +310,20 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 Debug.Log("[EasyProbeBaking](WriteBytes): meta data written to " + path);
                 
             }
+
+            int totalProbeCount = (int)(probeCountPerAxis.x * probeCountPerAxis.y * probeCountPerAxis.z);
             
             // SH L0L1
             {
                 var l0l1Packed = new NativeArray<half4>(s_Probes.Count * 3, 
                     Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                for (int i = 0; i < l0l1Packed.Length; i+=3)
+                for (int i = 0; i < totalProbeCount; ++i)
                 {
-                    l0l1Packed[i] = EasyProbeStreaming.s_SHAr[i / 3];
-                    l0l1Packed[i + 1] = EasyProbeStreaming.s_SHAg[i / 3];
-                    l0l1Packed[i + 2] = EasyProbeStreaming.s_SHAr[i / 3];
+                    l0l1Packed[i] = s_SHAr[i];
+                    l0l1Packed[i + totalProbeCount] = s_SHAg[i];
+                    l0l1Packed[i + 2 * totalProbeCount] = s_SHAb[i];
                 }
-
+                
                 var l0l1ByteSlice = l0l1Packed.Slice(0, l0l1Packed.Length).SliceConvert<byte>();
                 var bytesToWrite = new byte[l0l1ByteSlice.Length];
                 l0l1ByteSlice.CopyTo(bytesToWrite);
@@ -327,13 +337,15 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             {
                 var l2Packed = new NativeArray<half4>(s_Probes.Count * 4, 
                     Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                for (int i = 0; i < l2Packed.Length; i+=4)
+                
+                for (int i = 0; i < totalProbeCount; ++i)
                 {
-                    l2Packed[i] = EasyProbeStreaming.s_SHBr[i / 4];
-                    l2Packed[i + 1] = EasyProbeStreaming.s_SHBg[i / 4];
-                    l2Packed[i + 2] = EasyProbeStreaming.s_SHBb[i / 4];
-                    l2Packed[i + 3] = EasyProbeStreaming.s_SHC[i / 4];
+                    l2Packed[i] = s_SHBr[i];
+                    l2Packed[i + totalProbeCount] = s_SHBg[i];
+                    l2Packed[i + 2 * totalProbeCount] = s_SHBb[i];
+                    l2Packed[i + 3 * totalProbeCount] = s_SHC[i];
                 }
+                
                 var l2ByteSlice = l2Packed.Slice(0, l2Packed.Length).SliceConvert<byte>();
                 var bytesToWrite = new byte[l2ByteSlice.Length];
                 l2ByteSlice.CopyTo(bytesToWrite);

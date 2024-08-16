@@ -184,7 +184,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     probe.position,
                     out var pdf
                 );
-                    
+                
                 var radiance = SampleLight(sampleDir, probe, light) * lightAtten * visibilty / pdf / sampleCount;
                         
                 // probe.coefficients.Count = 27

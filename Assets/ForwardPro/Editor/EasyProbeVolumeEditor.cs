@@ -47,6 +47,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             internal static readonly Color k_GizmoColorBoundingSphere = new Color32(255, 155, 100, 255);
             
             internal static readonly Color k_GizmoColorBoundingBox = new Color32(255, 255, 0, 255);
+            internal static readonly Color k_GizmoColorActualVolumeBox = new Color32(255, 0, 0, 255);
 
             internal static readonly Color[] k_BaseHandlesColor = new Color[]
             {
@@ -61,6 +62,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         
         public enum SampleCount
         {
+            _1 = 1,
             _4 = 4,
             _8 = 8,
             _16 = 16,
@@ -125,6 +127,20 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 return _BoundingBox;
             }
         }
+        
+        private static HierarchicalBox _VolumeBox;
+        
+        static HierarchicalBox s_VolumeBox
+        {
+            get
+            {
+                if (_VolumeBox == null)
+                {
+                    _VolumeBox = new HierarchicalBox(Styles.k_GizmoColorActualVolumeBox);
+                }
+                return _VolumeBox;
+            }
+        }
 
         private static HierarchicalSphere _BoundingSphere;
 
@@ -157,7 +173,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         private static bool s_DisplayCell = false;
         private static bool s_DisplayProbe = false;
         private static bool s_DebugStreaming = false;
-        private static float s_RadiusScale = 0.1f;
+        private static float s_RadiusScale = 1f;
         private static ProbeDebug s_DebugDraw = ProbeDebug.Diffuse;
 
         private static EasyProbeMetaData s_EasyProbeMetadata;
@@ -403,10 +419,10 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     }
                 }
             }
-
+            
             {
-                // Display Cell
-                if (s_DisplayCell)
+                // Draw Streaming Cell
+                if (s_DebugStreaming && probeVolume.streamingCamera != null && EasyProbeSetup.Instance != null)
                 {
                     if (s_NeedReloadMetadata)
                     {
@@ -415,13 +431,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                             s_NeedReloadMetadata = false;
                         }
                     }
-                }
-            }
-            
-            {
-                // Draw Streaming Cell
-                if (s_DebugStreaming && probeVolume.streamingCamera != null && EasyProbeSetup.Instance != null)
-                {
+                    
                     float radius = 0;
                     switch (EasyProbeSetup.Instance.settings.budget)
                     {
@@ -453,11 +463,24 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
                     {
                         // Draw Streaming Cells
-                        if (s_DisplayCell && !s_NeedReloadMetadata)
+                        if (!s_NeedReloadMetadata)
                         {
                             EasyProbeStreaming.CalculateCellRange(sphereAABB, out var cellBoxMin, out var cellBoxMax
-                                , out var _, out var _);
-                            DrawCell(cellBoxMin, cellBoxMax);
+                                , out var volumeMin, out var volumeMax);
+                            
+                            if (s_DisplayCell)
+                            {
+                                DrawCell(cellBoxMin, cellBoxMax);
+                            }
+                            
+                            using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity,
+                                       Vector3.one)))
+                            {
+                                var volume = volumeMax + volumeMin;
+                                s_VolumeBox.center = new Vector3(volume.x, volume.y, volume.z) / 2.0f;
+                                s_VolumeBox.size = volumeMax - volumeMin;
+                                s_VolumeBox.DrawHull(false);
+                            }
                         }
                     }
 

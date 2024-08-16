@@ -130,7 +130,8 @@ MonoBehaviour:
   m_Active: 1
   settings:
     band: 0
-    budget: 0
+    budget: 2
+    enableStreaming: 0
 --- !u!114 &3573653513797426673
 MonoBehaviour:
   m_ObjectHideFlags: 0

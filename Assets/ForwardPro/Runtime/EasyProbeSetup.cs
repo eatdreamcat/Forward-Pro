@@ -21,15 +21,18 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             High
         }
 
+        // TODO: test
         public static int k_BoundingRadiusLow = 5;
         public static int k_BoundingRadiusMedium = 10;
-        public static int k_BoundingRadiusHigh = 15;
+        public static int k_BoundingRadiusHigh = 20;
 
         [Serializable]
         public class EasyProbeSettings
         {
             public SHBand band;
             public MemoryBudget budget;
+            // test
+            public bool enableStreaming;
         }
 
         class EasyProbeSetupPass : ScriptableRenderPass

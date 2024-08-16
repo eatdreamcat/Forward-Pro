@@ -80,7 +80,9 @@ float3 SampleEasySH9(half3 N, float3 positionWS, float2 positionSS, float3 direc
     // TODO: uvw offset
     float3 uvw = ((positionWS - _EasyVolumeWorldOffset) / _EasyProbeVolumeSize).xyz;
 
-    float mask = step(0.001, uvw) * step(uvw, 0.999);
+    float mask = step(0.01, uvw) * step(uvw, 0.99);
+
+    // return uvw * mask;
 
     half4 shAr = half4(SAMPLE_TEXTURE3D_LOD(_EasyProbeSHAr, sampler_EasyProbeSHAr, uvw, 0).rgba);
     half4 shAg = half4(SAMPLE_TEXTURE3D_LOD(_EasyProbeSHAg, sampler_EasyProbeSHAg, uvw, 0).rgba);
