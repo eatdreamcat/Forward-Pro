@@ -525,9 +525,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
             var fileHandle = GetFileHandle(filePath);
 
-            // s_SHArStreamingRequest.RunCommands(fileHandle);
-            // s_SHAbStreamingRequest.RunCommands(fileHandle);
-            // s_SHAgStreamingRequest.RunCommands(fileHandle);
+            s_SHArStreamingRequest.RunCommands(fileHandle);
+            s_SHAbStreamingRequest.RunCommands(fileHandle);
+            s_SHAgStreamingRequest.RunCommands(fileHandle);
             
             #if UNITY_EDITOR || ENABLE_PROFILER
             Profiler.EndSample();
@@ -608,7 +608,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 s_SHAgStreamingRequest.AddReadCommand(fileOffsetPerComponent, bytesToLoad, (byte*) s_SHAg.GetUnsafePtr());
                 s_SHAgStreamingRequest.RunCommands(fileHandle);
                 
-                s_SHAbStreamingRequest.Clear();
                 s_SHAbStreamingRequest.AddReadCommand(fileOffsetPerComponent * 2, bytesToLoad, (byte*) s_SHAb.GetUnsafePtr());
                 s_SHAbStreamingRequest.RunCommands(fileHandle);
                 
