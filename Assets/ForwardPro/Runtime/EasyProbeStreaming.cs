@@ -403,8 +403,11 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             var cameraAABB = CalculateSphereAABB(CalculateCameraFrustumSphere(ref s_Metadata, camera, radius));
             CalculateCellRange(cameraAABB, out var clampedCellMinWS, out var clampedCellMaxWS,
                 out var boxMinWS, out var boxMaxWS);
-
-            s_ProbeVolumeSize = boxMaxWS - boxMinWS + s_Metadata.probeSpacing * Vector3Int.one;
+            
+            s_ProbeVolumeSize.x = boxMaxWS.x - boxMinWS.x + s_Metadata.probeSpacing;
+            s_ProbeVolumeSize.y = boxMaxWS.y - boxMinWS.y + s_Metadata.probeSpacing;
+            s_ProbeVolumeSize.z = boxMaxWS.z - boxMinWS.z + s_Metadata.probeSpacing;
+            
             var halfProbeSpacing = s_Metadata.probeSpacing / 2f;
             s_ProbeVolumeWorldOffset = new Vector4(
                 clampedCellMinWS.x - halfProbeSpacing, 
@@ -413,7 +416,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 1.0f);
             
 
-            int bufferOffset = 0;
+            
             s_SHArRequests.Clear();
             s_SHAgRequests.Clear();
             s_SHAbRequests.Clear();
@@ -433,10 +436,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             var bytesInBoxPerLine = boxProbeCountPerAxis.x * k_BytesPerHalf4;
             
             var cellOffset = (clampedCellMinWS - s_Metadata.cellMin) / s_Metadata.cellSize;
+            var probeOffset = (s_Metadata.probeCountPerCellAxis - 1) * cellOffset;
             var probeIndexStart = cellOffset.x * (s_Metadata.probeCountPerCellAxis - 1)
-                                + cellOffset.y * s_Metadata.probeCountPerVolumeAxis.x
-                                + cellOffset.z * probeCountPerSlice;
+                                + probeOffset.y * s_Metadata.probeCountPerVolumeAxis.x
+                                + probeOffset.z * probeCountPerSlice;
 
+            int bufferOffset = 0;
+            
             var totalProbeCount = probeCountPerSlice * s_Metadata.probeCountPerVolumeAxis.z;
             
             for (int slice = 0; slice < probeCountPerAxis.z; ++slice)
