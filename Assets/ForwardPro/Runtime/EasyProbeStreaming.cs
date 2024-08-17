@@ -52,7 +52,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             public static string s_DoStreaming = "DoStreaming";
             public static string s_TextureUploadCPU = "TextureUploadCPU";
             public static string s_BytesStreamRead = "BytesStreamRead";
-            public static string s_FileStreamSeek = "FileStreamSeeK";
+            public static string s_FileStreamSeek = "FileStreamSeek";
             public static string s_FileStreamRead = "FileStreamRead";
             public static string s_ProcessStreamingRequest = "ProcessStreamingRequest";
         }
