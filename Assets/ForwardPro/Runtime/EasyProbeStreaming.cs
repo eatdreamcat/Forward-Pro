@@ -732,7 +732,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     
                 }
                 
-                if (s_EnableStreaming && camera.cameraType == CameraType.Game)
+                if (s_EnableStreaming)
                 {
                     return DoStreaming(camera, radius);
                 }
