@@ -130,8 +130,12 @@ MonoBehaviour:
   m_Active: 1
   settings:
     band: 0
-    budget: 0
+    budget: 2
     enableStreaming: 1
+    sceneViewStreamingWithCustomBox: 1
+    streamingBounds:
+      m_Center: {x: 18.534636, y: 6.0462966, z: 69.61581}
+      m_Extent: {x: 12.029318, y: 7.645777, z: 9.272926}
 --- !u!114 &3573653513797426673
 MonoBehaviour:
   m_ObjectHideFlags: 0

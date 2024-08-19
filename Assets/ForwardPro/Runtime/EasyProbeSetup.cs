@@ -32,6 +32,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             public SHBand band;
             public MemoryBudget budget;
             public bool enableStreaming;
+
+#if UNITY_EDITOR
+            [HideInInspector]
+            public bool sceneViewStreamingWithCustomBox;
+            [HideInInspector]
+            public Bounds streamingBounds = new (Vector3.zero, Vector3.one);
+#endif
         }
 
         class EasyProbeSetupPass : ScriptableRenderPass

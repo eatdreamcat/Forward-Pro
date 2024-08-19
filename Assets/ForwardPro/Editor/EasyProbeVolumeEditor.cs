@@ -36,11 +36,14 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             internal static readonly GUIContent s_ProbeVolumeIntensity = new GUIContent("Probe Shading Intensity");
 
             internal static readonly GUIContent s_DebugStreaming = new GUIContent("Debug Streaming");
+            internal static readonly GUIContent s_EnableStreaming = new GUIContent("Enable Streaming");
+            internal static readonly GUIContent s_StreamDebugMode = new GUIContent("Streaming Debug Mode");
             internal static readonly GUIContent s_StreamingCamera = new GUIContent("Streaming Camera");
             internal static readonly GUIContent s_StreamingMemoryBudget = new GUIContent("Memory Budget");
             internal static readonly GUIContent s_StreamingRadiusScale = new GUIContent("Radius Scale");
             
             internal static readonly Color k_GizmoColorBase = new Color32(137, 222, 144, 255);
+            internal static readonly Color k_GizmoStreamingBoxColor = new Color32(137, 100, 255, 255);
             
             internal static readonly Color k_GizmoColorCell = new Color32(50, 255, 255, 255);
 
@@ -58,6 +61,16 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 k_GizmoColorBase,
                 k_GizmoColorBase,
                 k_GizmoColorBase
+            };
+            
+            internal static readonly Color[] k_StreamingBoxHandlesColor = new Color[]
+            {
+                k_GizmoStreamingBoxColor,
+                k_GizmoStreamingBoxColor,
+                k_GizmoStreamingBoxColor,
+                k_GizmoStreamingBoxColor,
+                k_GizmoStreamingBoxColor,
+                k_GizmoStreamingBoxColor
             };
         }
         
@@ -83,6 +96,12 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             Visibility,
             Diffuse
         }
+
+        public enum StreamingDebugMode
+        {
+            Camera,
+            CustomBox
+        }
         
         private SampleCount m_SampleCount = SampleCount._1;
         
@@ -98,6 +117,20 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     _ShapeBox = new HierarchicalBox(Styles.k_GizmoColorBase, Styles.k_BaseHandlesColor);
                 }
                 return _ShapeBox;
+            }
+        }
+        
+        static HierarchicalBox _StreamingDebugBox;
+        static HierarchicalBox s_StreamingDebugBox
+        {
+            get
+            {
+                if (_StreamingDebugBox == null)
+                {
+                    _StreamingDebugBox = new HierarchicalBox(Styles.k_GizmoStreamingBoxColor, 
+                        Styles.k_StreamingBoxHandlesColor);
+                }
+                return _StreamingDebugBox;
             }
         }
 
@@ -188,6 +221,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         private static bool s_DisplayCell = false;
         private static bool s_DisplayProbe = false;
         private static bool s_DebugStreaming = false;
+        private static StreamingDebugMode s_StreamingDebugMode = StreamingDebugMode.CustomBox;
         private static float s_RadiusScale = 1f;
         private static bool s_RandomLightColor = false;
         private static ProbeDebug s_DebugDraw = ProbeDebug.Diffuse;
@@ -281,8 +315,24 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             if (s_DebugStreaming)
             {
                 EditorGUI.indentLevel++;
-                EditorGUILayout.PropertyField(serialized.streamingCamera, Styles.s_StreamingCamera);
-                s_RadiusScale = EditorGUILayout.Slider(Styles.s_StreamingRadiusScale, s_RadiusScale, 0.01f, 1.0f);
+
+                s_StreamingDebugMode = (StreamingDebugMode)EditorGUILayout.EnumPopup(Styles.s_StreamDebugMode, 
+                    s_StreamingDebugMode);
+                if (s_StreamingDebugMode == StreamingDebugMode.Camera)
+                {
+                    EditorGUILayout.PropertyField(serialized.streamingCamera, Styles.s_StreamingCamera);
+                    s_RadiusScale = EditorGUILayout.Slider(Styles.s_StreamingRadiusScale, s_RadiusScale,
+                        0.01f, 1.0f);
+                    EasyProbeSetup.Instance.settings.sceneViewStreamingWithCustomBox = false;
+                }
+                else
+                {
+                    EasyProbeSetup.Instance.settings.sceneViewStreamingWithCustomBox = true;
+                }
+
+                EasyProbeSetup.Instance.settings.enableStreaming =
+                    EditorGUILayout.Toggle(Styles.s_EnableStreaming, EasyProbeSetup.Instance.settings.enableStreaming);
+               
                 if (EasyProbeSetup.Instance != null)
                 {
                     EasyProbeSetup.Instance.settings.budget =
@@ -420,6 +470,26 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 s_ShapeBox.size = probeVolume.volumeSize;
                 s_ShapeBox.DrawHull(EditMode.editMode == k_EditShape);
             }
+
+            if (EasyProbeSetup.Instance != null)
+            {
+                if (EasyProbeSetup.Instance.settings.sceneViewStreamingWithCustomBox)
+                {
+                    using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity,
+                               Vector3.one)))
+                    {
+                        if (EasyProbeSetup.Instance.settings.streamingBounds.size == Vector3.zero)
+                        {
+                            EasyProbeSetup.Instance.settings.streamingBounds.size = probeVolume.volumeSize;
+                            EasyProbeSetup.Instance.settings.streamingBounds.center = probeVolume.transform.position;
+                        }
+                        
+                        s_StreamingDebugBox.center = EasyProbeSetup.Instance.settings.streamingBounds.center;
+                        s_StreamingDebugBox.size = EasyProbeSetup.Instance.settings.streamingBounds.size;
+                        s_StreamingDebugBox.DrawHull(EditMode.editMode == k_EditShape);
+                    }
+                }
+            }
             
             {
                 // Draw Probe
@@ -482,7 +552,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                         // Draw Streaming Cells
                         if (!s_NeedReloadMetadata)
                         {
-                            EasyProbeStreaming.CalculateCellRange(sphereAABB, out var cellBoxMin, out var cellBoxMax
+                            EasyProbeStreaming.CalculateCellRange(sphereAABB, EasyProbeSetup.Instance.settings.sceneViewStreamingWithCustomBox, 
+                                out var cellBoxMin, out var cellBoxMax
                                 , out var volumeMin, out var volumeMax);
                             
                             if (s_DisplayCell)
@@ -539,6 +610,28 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     probeVolume.volumeSize = s_ShapeBox.size;
                     Vector3 delta = s_ShapeBox.center - probeVolume.transform.position;
                     probeVolume.transform.position += delta; 
+                }
+            }
+
+            if (EasyProbeSetup.Instance != null && EasyProbeSetup.Instance.settings.sceneViewStreamingWithCustomBox)
+            {
+                using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one)))
+                {
+                    Vector3 newPosition = Handles.PositionHandle(EasyProbeSetup.Instance.settings.streamingBounds.center,
+                        Quaternion.identity);
+
+                    EasyProbeSetup.Instance.settings.streamingBounds.center = newPosition;
+                    
+                    s_StreamingDebugBox.size = EasyProbeSetup.Instance.settings.streamingBounds.size;
+                    s_StreamingDebugBox.center = EasyProbeSetup.Instance.settings.streamingBounds.center;
+                    s_StreamingDebugBox.monoHandle = false;
+                    EditorGUI.BeginChangeCheck();
+                    s_StreamingDebugBox.DrawHandle();
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        EasyProbeSetup.Instance.settings.streamingBounds.size = s_StreamingDebugBox.size;
+                        EasyProbeSetup.Instance.settings.streamingBounds.center = s_StreamingDebugBox.center;
+                    }
                 }
             }
         }

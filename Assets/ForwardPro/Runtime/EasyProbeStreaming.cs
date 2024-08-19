@@ -236,6 +236,14 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         public static bool ReadBytesFromRelativePath(FileStream fs, ref byte[] buffer, int bufferOffset, long fileOffset, int length, out int readBytes)
         {
             readBytes = 0;
+            
+            if (length <= 0)
+            {
+                Debug.LogError("[EasyProbeStreaming](ReadBytesFromRelativePath): bytes to read is zero.");
+                return false;
+            }
+            
+           
             if (buffer.Length - bufferOffset < length)
             {
                 Debug.LogError("[EasyProbeStreaming](ReadBytesFromRelativePath): buffer is lack of size.");
@@ -401,8 +409,14 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             #endif
 
             var cameraAABB = CalculateSphereAABB(CalculateCameraFrustumSphere(ref s_Metadata, camera, radius));
-            CalculateCellRange(cameraAABB, out var clampedCellMinWS, out var clampedCellMaxWS,
+            CalculateCellRange(cameraAABB, camera, out var clampedCellMinWS, out var clampedCellMaxWS,
                 out var boxMinWS, out var boxMaxWS);
+
+            if (clampedCellMaxWS.x < clampedCellMinWS.x || clampedCellMaxWS.y < clampedCellMinWS.y ||
+                clampedCellMaxWS.z < clampedCellMinWS.z)
+            {
+                return false;
+            }
             
             s_ProbeVolumeSize.x = boxMaxWS.x - boxMinWS.x + s_Metadata.probeSpacing;
             s_ProbeVolumeSize.y = boxMaxWS.y - boxMinWS.y + s_Metadata.probeSpacing;
@@ -414,8 +428,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 clampedCellMinWS.y - halfProbeSpacing,
                 clampedCellMinWS.z - halfProbeSpacing, 
                 1.0f);
-            
-
             
             s_SHArRequests.Clear();
             s_SHAgRequests.Clear();
@@ -785,25 +797,24 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             );
         }
         
-        public static void CalculateCellRange(Bounds cameraAABB, 
+        public static void CalculateCellRange(Bounds cameraAABB, bool debugMode,
             out Vector3Int clampedCellMinWS, 
             out Vector3Int clampedCellMaxWS,
             out Vector3Int boxMinWS,
             out Vector3Int boxMaxWS)
         {
+#if UNITY_EDITOR
+            
+            if (debugMode && EasyProbeSetup.Instance != null
+                          && EasyProbeSetup.Instance.settings.sceneViewStreamingWithCustomBox)
+            {
+                cameraAABB = EasyProbeSetup.Instance.settings.streamingBounds;
+            }
+#endif
+            
             int cellSize = s_Metadata.cellSize;
             var cellMin = s_Metadata.cellMin;
             var cellMax = s_Metadata.cellMax;
-
-            // {
-            //     // test
-            //     boxMaxWS = cellMax;
-            //     boxMinWS = cellMin;
-            //
-            //     clampedCellMinWS = cellMin;
-            //     clampedCellMaxWS = cellMax;
-            //     return;
-            // }
             
             var boxCenter = GetCellIndexStart(cameraAABB.center, cellSize) * cellSize 
                             + new Vector3Int(cellSize / 2, cellSize / 2, cellSize / 2);
@@ -815,7 +826,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             
             boxMinWS = boxCenter - Vector3Int.one * maxExtend;
             boxMaxWS = boxCenter + Vector3Int.one * maxExtend;
-                
+            
             clampedCellMinWS = Max3(boxMinWS, cellMin);
             clampedCellMaxWS = Min3(boxMaxWS, cellMax);
             
