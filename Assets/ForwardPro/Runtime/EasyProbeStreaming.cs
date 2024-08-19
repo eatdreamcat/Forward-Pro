@@ -74,6 +74,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         
         private static int _EasyProbeVolumeSize = Shader.PropertyToID("_EasyProbeVolumeSize");
         private static int _EasyProbeVolumeWorldOffset = Shader.PropertyToID("_EasyProbeVolumeWorldOffset");
+        private static int _ProbeVolumeClampedMax = Shader.PropertyToID("_ProbeVolumeClampedMax");
         private static int _EasyProbeNoiseFrameIndex = Shader.PropertyToID("_EasyProbeNoiseFrameIndex");
         private static int _EasyPVSamplingNoise = Shader.PropertyToID("_EasyPVSamplingNoise");
        
@@ -110,6 +111,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         
         public static Vector3 s_ProbeVolumeSize;
         public static Vector4 s_ProbeVolumeWorldOffset;
+        public static Vector4 s_ProbeVolumeClampedMax;
 
         private static int s_BufferStartIndex;
         private static int s_BufferEndIndex;
@@ -428,6 +430,12 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 clampedCellMinWS.y - halfProbeSpacing,
                 clampedCellMinWS.z - halfProbeSpacing, 
                 1.0f);
+            s_ProbeVolumeClampedMax = new Vector4(
+                clampedCellMaxWS.x,
+                clampedCellMaxWS.y,
+                clampedCellMaxWS.z,
+                1.0f
+            );
             
             s_SHArRequests.Clear();
             s_SHAgRequests.Clear();
@@ -898,6 +906,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             cmd.SetGlobalVector(_EasyProbeVolumeSize, s_ProbeVolumeSize);
             s_ProbeVolumeWorldOffset.w = EasyProbeVolume.s_EasyProbeIntensity;
             cmd.SetGlobalVector(_EasyProbeVolumeWorldOffset, s_ProbeVolumeWorldOffset);
+            cmd.SetGlobalVector(_ProbeVolumeClampedMax, s_ProbeVolumeClampedMax);
             
             cmd.SetGlobalFloat(_EasyProbeNoiseFrameIndex, cameraData.antialiasing == AntialiasingMode.TemporalAntiAliasing ?
                 Time.frameCount : 0);

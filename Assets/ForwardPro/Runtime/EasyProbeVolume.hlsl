@@ -41,10 +41,12 @@ SAMPLER(sampler_EasyProbeSHC);
 
 float3 _EasyProbeVolumeSize;
 float4 _EasyProbeVolumeWorldOffset;
+float4 _ProbeVolumeClampedMax;
 float _EasyPVSamplingNoise;
 float _EasyProbeNoiseFrameIndex;
 
 #define _EasyVolumeWorldOffset _EasyProbeVolumeWorldOffset.xyz
+#define _EasyVolumeWorldPosMax _ProbeVolumeClampedMax.xyz
 #define _EasyProbeIntensity _EasyProbeVolumeWorldOffset.w
 
 // -------------------------------------------------------------
@@ -77,6 +79,11 @@ float3 SampleEasySH9(half3 N, float3 positionWS, float2 positionSS, float3 direc
 
     positionWS = AddNoiseToSamplingPosition(positionWS, positionSS, direction);
 
+    if (any(positionWS.xyz > _EasyVolumeWorldPosMax.xyz))
+    {
+        return 0;
+    }
+    
     // TODO: uvw offset
     float3 uvw = ((positionWS - _EasyVolumeWorldOffset) / _EasyProbeVolumeSize).xyz;
     float mask = any(uvw < 0.001) || any(uvw > 0.999);
