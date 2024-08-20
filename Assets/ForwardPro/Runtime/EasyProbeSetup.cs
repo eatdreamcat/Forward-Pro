@@ -1,5 +1,6 @@
 using System;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.SceneManagement;
 
 namespace UnityEngine.Rendering.EasyProbeVolume
 {
@@ -43,7 +44,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
         class EasyProbeSetupPass : ScriptableRenderPass
         {
-
+            public static int _EasyProbeToggle = Shader.PropertyToID("_EasyProbeToggle");
             public EasyProbeSettings settings;
 
             // This method is called before executing the render pass.
@@ -93,13 +94,24 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             m_ScriptablePass.settings = settings;
             // Configures where the render pass should be injected.
             m_ScriptablePass.renderPassEvent = RenderPassEvent.BeforeRendering;
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            EasyProbeStreaming.SetMetadataDirty();
         }
 
         // Here you can inject one or multiple render passes in the renderer.
         // This method is called when setting up the renderer once per-camera.
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
-            renderer.EnqueuePass(m_ScriptablePass);
+            Shader.SetGlobalFloat(EasyProbeSetupPass._EasyProbeToggle, 0.0f);
+            if (EasyProbeVolume.s_ProbeVolumes.Count > 0)
+            {
+                renderer.EnqueuePass(m_ScriptablePass);
+            }
         }
 
         protected override void Dispose(bool disposing)
@@ -109,6 +121,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             EasyProbeStreaming.Dispose();
 
             s_Instance = null;
+            SceneManager.sceneLoaded -= OnSceneLoaded;
         }
     }
 

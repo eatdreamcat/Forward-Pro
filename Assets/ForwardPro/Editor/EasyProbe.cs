@@ -1,16 +1,15 @@
+using System;
 using System.Collections.Generic;
+using Unity.Collections;
 
 namespace UnityEngine.Rendering.EasyProbeVolume
 {
-    public class EasyProbe
+    public class EasyProbe : IDisposable
     {
-        // L2
-        public static int s_CoefficientCount = 27;
-        
         public List<EasyProbeCell> cells = new ();
         public Vector3Int position;
        
-        public List<float> coefficients = new();
+        public NativeArray<float> coefficients = new NativeArray<float>(27, Allocator.TempJob, NativeArrayOptions.ClearMemory);
 
         public float atten = 0.0f;
         public float visibilty = 0.0f;
@@ -18,10 +17,11 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         public EasyProbe(Vector3Int position)
         {
             this.position = position;
-            for (int i = 0; i < s_CoefficientCount; ++i)
-            {
-                coefficients.Add(0);
-            }
+        }
+
+        public void Dispose()
+        {
+            coefficients.Dispose();
         }
     }
 }

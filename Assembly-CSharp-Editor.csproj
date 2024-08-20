@@ -47,6 +47,7 @@
   <ItemGroup>
     <Compile Include="Assets\ForwardPro\Editor\SerializedEasyProbeVolume.cs" />
     <Compile Include="Assets\ForwardPro\Editor\Gizmo\EasyProbeSphere.cs" />
+    <Compile Include="Assets\ForwardPro\Editor\EasyProbeBakingJob.cs" />
     <Compile Include="Assets\ForwardPro\Editor\EasyProbe.cs" />
     <Compile Include="Assets\ForwardPro\Editor\EasyProbeVolumeEditor.cs" />
     <Compile Include="Assets\ForwardPro\Editor\EasyProbeBakingUtils.cs" />

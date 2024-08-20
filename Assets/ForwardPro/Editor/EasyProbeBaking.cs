@@ -67,7 +67,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         {
             foreach (var cell in probe.cells)
             {
-                if (lightSource.IntersectCell(cell))
+                if (lightSource.IntersectCell(cell.bounds))
                 {
                     return true;
                 }
@@ -95,18 +95,37 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             Directory.CreateDirectory(output);
             AssetDatabase.Refresh();
 
-            foreach (var probe in s_Probes)
             {
-                foreach (var lightSource in lightSources)
+                var coefficients = new NativeArray<float>(27 * s_Probes.Count, Allocator.TempJob,
+                    NativeArrayOptions.UninitializedMemory);
+                var probePosition = new NativeArray<Vector3Int>(s_Probes.Count, Allocator.TempJob,
+                    NativeArrayOptions.UninitializedMemory);
+                for (int i = 0; i < s_Probes.Count; ++i)
                 {
-                    if (NeedBake(probe, lightSource))
-                    {
-                        EasyProbeBakingUtils.BakeProbe(lightSource, probe, sampleCount);
-                    }
+                    probePosition[i] = s_Probes[i].position;
                 }
+                var probeAtten = new NativeArray<float>(s_Probes.Count, Allocator.TempJob);
+                var probeVisibility = new NativeArray<float>(s_Probes.Count, Allocator.TempJob);
+                
+                var lights = new NativeArray<EasyProbeLightSource>(lightSources.Count, Allocator.TempJob,
+                    NativeArrayOptions.UninitializedMemory);
+
+                for (int i = 0; i < lightSources.Count; ++i)
+                {
+                    lights[i] = lightSources[i];
+                }
+
+                var bakingHandle = EasyProbeBakingJob.BakingProbe(
+                    ref  coefficients,
+                    ref  probeAtten,
+                    ref  probeVisibility,
+                    ref  probePosition,
+                    ref lights
+                    );
+                bakingHandle.Complete();
             }
             
-            WriteOutput();
+            // WriteOutput();
             
             EasyProbeStreaming.Dispose();
         }

@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Collections;
 using UnityEngine;
 
 namespace UnityEngine.Rendering.EasyProbeVolume
@@ -135,44 +136,45 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return lightAtten * (smoothFactor + k);
         }
         
-        static Color SamplePointLight(Vector3 direction, EasyProbe probe, Light light, Color lightColor)
+        static Color SamplePointLight(Vector3 direction, Vector3 probePosition, EasyProbeLightSource light, Color lightColor)
         {
-            var position = probe.position;
-            var dirToLight = light.transform.position - position;
+            var position = probePosition;
+            var dirToLight = light.lightPosition - position;
             var color = lightColor *
                         Mathf.Max(0, Vector3.Dot(direction, dirToLight.normalized) * 0.5f + 0.5f);
             
             return color;
         }
         
-        static Color SampleLight(Vector3 direction, EasyProbe probe, Light light, Color lightColor)
+        static Color SampleLight(Vector3 direction, Vector3 probePosition, EasyProbeLightSource light, Color lightColor)
         {
             switch (light.type)
             {
                 case LightType.Point:
-                    return SamplePointLight(direction, probe, light, lightColor);
+                    return SamplePointLight(direction, probePosition, light, lightColor);
             }
             
             return Color.black;
         }
         
         
-        public static void BakeProbe(EasyProbeLightSource lightSource, EasyProbe probe, int sampleCount)
+        public static void BakeProbe(EasyProbeLightSource lightSource, Vector3 probePosition, 
+            ref NativeArray<float> atten, ref NativeArray<float> probevisibility, ref NativeArray<float> coefficients,
+            int sampleCount, int probeIndex)
         {
-            var light = lightSource.light;
-            var dirToLight = light.transform.position - probe.position;
+            var dirToLight = lightSource.lightPosition - probePosition;
             var lightAtten =
-                CalculatePointLightAttenuation(dirToLight.sqrMagnitude, light.range, EasyProbeBaking.s_PointAttenConstantK);
-            lightAtten *= light.intensity;
-            probe.atten = Mathf.Max(lightAtten, probe.atten);
+                CalculatePointLightAttenuation(dirToLight.sqrMagnitude, lightSource.lightRange, EasyProbeBaking.s_PointAttenConstantK);
+            lightAtten *= lightSource.lightIntensity;
+            atten[probeIndex] = Mathf.Max(lightAtten, atten[probeIndex]);
             
             var visibilty = 1.0f;
-            Ray ray = new Ray(probe.position, dirToLight.normalized);
+            Ray ray = new Ray(probePosition, dirToLight.normalized);
             if (Physics.Raycast(ray, dirToLight.magnitude))
             {
                 visibilty = 0.0f;
             }
-            probe.visibilty = Mathf.Max(probe.visibilty, visibilty);
+            probevisibility[probeIndex] = Mathf.Max(probevisibility[probeIndex], visibilty);
             
          
             var dir = dirToLight.normalized;
@@ -182,24 +184,26 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     HaltonSequence.Get((sampleIndex & 1023) + 1, 2), 
                     HaltonSequence.Get((sampleIndex & 1023) + 1, 3), 
                     dir, 
-                    probe.position,
+                    probePosition,
                     out var pdf
                 );
                 
-                var radiance = SampleLight(sampleDir, probe, light, lightSource.isRandomColor ? 
-                    new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f), 1.0f) : light.color) * lightAtten * visibilty / pdf / sampleCount;
-                        
+                var radiance = SampleLight(sampleDir, probePosition, lightSource, lightSource.isRandomColor ? 
+                    new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f), 1.0f) : lightSource.lightColor) 
+                    * lightAtten * visibilty / pdf / sampleCount;
+
+                int probeCoefficientBaseIndex = probeIndex * 27;
                 // probe.coefficients.Count = 27
-                for (int coefficientIndex = 0; coefficientIndex < probe.coefficients.Count; coefficientIndex += 3)
+                for (int coefficientIndex = 0; coefficientIndex < 27; coefficientIndex += 3)
                 {
                     var level = coefficientIndex / 3;
-                    probe.coefficients[coefficientIndex] +=
+                    coefficients[probeCoefficientBaseIndex + coefficientIndex] +=
                         SHBasicFull(sampleDir, level) * radiance.r *
                         BasicConstant(level);
-                    probe.coefficients[coefficientIndex + 1] +=
+                    coefficients[probeCoefficientBaseIndex + coefficientIndex + 1] +=
                         SHBasicFull(sampleDir, level) * radiance.g *
                         BasicConstant(level);
-                    probe.coefficients[coefficientIndex + 2] +=
+                    coefficients[probeCoefficientBaseIndex + coefficientIndex + 2] +=
                         SHBasicFull(sampleDir, level) * radiance.b *
                         BasicConstant(level);
                 }

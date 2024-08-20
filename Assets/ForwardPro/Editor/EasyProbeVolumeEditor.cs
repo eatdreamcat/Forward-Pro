@@ -12,6 +12,16 @@ namespace UnityEngine.Rendering.EasyProbeVolume
     [CustomEditor(typeof(EasyProbeVolume))]
     public class EasyProbeVolumeEditor : Editor
     {
+        [MenuItem("GameObject/Light/Easy Probe Volume", false, 10)]
+        private static void CreateCustomGameObject(MenuCommand menuCommand)
+        {
+            GameObject probeVolume = new GameObject("EasyProbeVolume");
+            probeVolume.AddComponent<EasyProbeVolume>();
+            GameObjectUtility.SetParentAndAlign(probeVolume, menuCommand.context as GameObject);
+            Undo.RegisterCreatedObjectUndo(probeVolume, "Create " + probeVolume.name);
+            Selection.activeObject = probeVolume;
+        }
+        
         internal const EditMode.SceneViewEditMode k_EditShape = EditMode.SceneViewEditMode.ReflectionProbeBox;
         internal static class Styles
         {
@@ -377,8 +387,14 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     }
                     
                     s_LightSources.Add(new EasyProbeLightSource(
-                        new Bounds(light.transform.position, new Vector3(light.range, light.range, light.range)),
-                        light, s_RandomLightColor));
+                        new Bounds(
+                            light.transform.position, new Vector3(light.range, light.range, light.range)),
+                        light.transform.position,
+                        light.intensity,
+                        light.color,
+                        light.range,
+                        light.type,
+                        s_RandomLightColor));
                 }
                 
                 EasyProbeBaking.Bake(s_LightSources, (int)m_SampleCount);
