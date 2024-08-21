@@ -101,6 +101,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             Directory.CreateDirectory(output);
             AssetDatabase.Refresh();
             
+            SortByWorldPositionXYZ();
+            
             {
                 if (s_ProbeCoefficientsFlatten.IsCreated)
                 {
@@ -261,9 +263,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         
         static void WriteOutput()
         {
-           
-            SortByWorldPositionXYZ();
-            
             var cellMin = s_ProbeCells[0].Min;
             var cellMax = s_ProbeCells[s_ProbeCells.Count - 1].Max;
             var halfSize = s_ProbeSpacing / 2.0f;

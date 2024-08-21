@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
@@ -180,7 +181,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             probevisibility[probeIndex * lightCount + lightIndex] = visibilty;
             
             var dir = dirToLight.normalized;
-            
+            sampleCount = Math.Max(1, sampleCount);
             int probeCoefficientBaseIndex = probeIndex * 27 * sampleCount;
             
             for (int sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
@@ -198,14 +199,15 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     * lightAtten * visibilty / pdf / sampleCount;
                 
                 // probe.coefficients.Count = 27
+                var coefficientBaseIndex = probeCoefficientBaseIndex + sampleIndex * 27;
                 for (int coefficientIndex = 0; coefficientIndex < 27; coefficientIndex += 3)
                 {
                     var level = coefficientIndex / 3;
                     var radianceEncoded = SHBasicFull(sampleDir, level) * BasicConstant(level) * radiance;
                     
-                    coefficients[probeCoefficientBaseIndex + sampleIndex * 27 + coefficientIndex] += radianceEncoded.r;
-                    coefficients[probeCoefficientBaseIndex + sampleIndex * 27 + coefficientIndex + 1] += radianceEncoded.g;
-                    coefficients[probeCoefficientBaseIndex + sampleIndex * 27 + coefficientIndex + 2] += radianceEncoded.b;
+                    coefficients[coefficientBaseIndex + coefficientIndex] += radianceEncoded.r;
+                    coefficients[coefficientBaseIndex + coefficientIndex + 1] += radianceEncoded.g;
+                    coefficients[coefficientBaseIndex + coefficientIndex + 2] += radianceEncoded.b;
                 }
             }
                 

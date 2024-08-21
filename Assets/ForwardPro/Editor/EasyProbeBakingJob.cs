@@ -96,7 +96,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 var l2_5thr = (half)coefficientSrc[coefficientBaseIndex + 24];
                 var l2_5thg = (half)coefficientSrc[coefficientBaseIndex + 25];
                 var l2_5thb = (half)coefficientSrc[coefficientBaseIndex + 26];
-                
                 shCDst[probeIndex] = new half4(l2_5thr, l2_5thg, l2_5thb,(half)1.0f);
             }
         }
