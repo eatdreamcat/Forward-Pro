@@ -90,21 +90,21 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         private static string s_EasyProbeSHBbName = "_EasyProbeSHBb";
         private static string s_EasyProbeSHCName = "_EasyProbeSHC";
         
-        public static Texture s_EasyProbeSHAr = null;
-        public static Texture s_EasyProbeSHAg = null;
-        public static Texture s_EasyProbeSHAb = null;
-        public static Texture s_EasyProbeSHBr = null;
-        public static Texture s_EasyProbeSHBg = null;
-        public static Texture s_EasyProbeSHBb = null;
-        public static Texture s_EasyProbeSHC = null;
+        private static Texture s_EasyProbeSHAr = null;
+        private static Texture s_EasyProbeSHAg = null;
+        private static Texture s_EasyProbeSHAb = null;
+        private static Texture s_EasyProbeSHBr = null;
+        private static Texture s_EasyProbeSHBg = null;
+        private static Texture s_EasyProbeSHBb = null;
+        private static Texture s_EasyProbeSHC = null;
         
-        public static byte[] s_SHAr;
-        public static byte[] s_SHAg;
-        public static byte[] s_SHAb;
-        public static byte[] s_SHBr;
-        public static byte[] s_SHBg;
-        public static byte[] s_SHBb;
-        public static byte[] s_SHC;
+        private static byte[] s_SHAr;
+        private static byte[] s_SHAg;
+        private static byte[] s_SHAb;
+        private static byte[] s_SHBr;
+        private static byte[] s_SHBg;
+        private static byte[] s_SHBb;
+        private static byte[] s_SHC;
 
         public static EasyProbeMetaData s_Metadata;
         public static List<EasyCellData> s_CellDatas = new List<EasyCellData>();
