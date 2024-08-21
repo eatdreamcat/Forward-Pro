@@ -28,7 +28,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             internal static readonly GUIContent s_DisplayProbe = new GUIContent("Display Probe");
             internal static readonly GUIContent s_ProbeDrawSize = new GUIContent("Probe Draw Size");
             
-            internal static readonly GUIContent s_SampleDirDensity = new GUIContent("Sample Direction Density");
+            internal static readonly GUIContent s_RandomLightColor = new GUIContent("Random Light Color");
             internal static readonly GUIContent s_SampleCount = new GUIContent("Sample Count");
             internal static readonly GUIContent s_PointLightAttenuationConstant = new GUIContent("Point Light Attenuation Constant");
             internal static readonly GUIContent s_ProbeDebugType = new GUIContent("DebugDraw");
@@ -84,7 +84,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             Diffuse
         }
         
-        private SampleCount m_SampleCount = SampleCount._4;
+        private SampleCount m_SampleCount = SampleCount._1;
         
         private static List<EasyProbeLightSource> s_LightSources = new();
         private static List<Light> s_Lights = new();
@@ -189,6 +189,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         private static bool s_DisplayProbe = false;
         private static bool s_DebugStreaming = false;
         private static float s_RadiusScale = 1f;
+        private static bool s_RandomLightColor = false;
         private static ProbeDebug s_DebugDraw = ProbeDebug.Diffuse;
 
         private static EasyProbeMetaData s_EasyProbeMetadata;
@@ -258,6 +259,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
             // m_SampleDirDensity = (SampleDirDensity)EditorGUILayout.EnumPopup(Styles.s_SampleDirDensity, m_SampleDirDensity);
             m_SampleCount = (SampleCount)EditorGUILayout.EnumPopup(Styles.s_SampleCount, m_SampleCount);
+            s_RandomLightColor = EditorGUILayout.Toggle(Styles.s_RandomLightColor, s_RandomLightColor);
             EasyProbeBaking.s_PointAttenConstantK =
                 EditorGUILayout.Slider(Styles.s_PointLightAttenuationConstant, EasyProbeBaking.s_PointAttenConstantK,
                     0.01f, 0.1f);
@@ -326,7 +328,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     
                     s_LightSources.Add(new EasyProbeLightSource(
                         new Bounds(light.transform.position, new Vector3(light.range, light.range, light.range)),
-                        light));
+                        light, s_RandomLightColor));
                 }
                 
                 EasyProbeBaking.Bake(s_LightSources, (int)m_SampleCount);

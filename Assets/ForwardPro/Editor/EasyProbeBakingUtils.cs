@@ -135,30 +135,31 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return lightAtten * (smoothFactor + k);
         }
         
-        static Color SamplePointLight(Vector3 direction, EasyProbe probe, Light light)
+        static Color SamplePointLight(Vector3 direction, EasyProbe probe, Light light, Color lightColor)
         {
             var position = probe.position;
             var dirToLight = light.transform.position - position;
-            var color = light.color *
+            var color = lightColor *
                         Mathf.Max(0, Vector3.Dot(direction, dirToLight.normalized) * 0.5f + 0.5f);
             
             return color;
         }
         
-        static Color SampleLight(Vector3 direction, EasyProbe probe, Light light)
+        static Color SampleLight(Vector3 direction, EasyProbe probe, Light light, Color lightColor)
         {
             switch (light.type)
             {
                 case LightType.Point:
-                    return SamplePointLight(direction, probe, light);
+                    return SamplePointLight(direction, probe, light, lightColor);
             }
             
             return Color.black;
         }
         
         
-        public static void BakeProbe(Light light, EasyProbe probe, int sampleCount)
+        public static void BakeProbe(EasyProbeLightSource lightSource, EasyProbe probe, int sampleCount)
         {
+            var light = lightSource.light;
             var dirToLight = light.transform.position - probe.position;
             var lightAtten =
                 CalculatePointLightAttenuation(dirToLight.sqrMagnitude, light.range, EasyProbeBaking.s_PointAttenConstantK);
@@ -185,7 +186,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     out var pdf
                 );
                 
-                var radiance = SampleLight(sampleDir, probe, light) * lightAtten * visibilty / pdf / sampleCount;
+                var radiance = SampleLight(sampleDir, probe, light, lightSource.isRandomColor ? 
+                    new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f), 1.0f) : light.color) * lightAtten * visibilty / pdf / sampleCount;
                         
                 // probe.coefficients.Count = 27
                 for (int coefficientIndex = 0; coefficientIndex < probe.coefficients.Count; coefficientIndex += 3)
