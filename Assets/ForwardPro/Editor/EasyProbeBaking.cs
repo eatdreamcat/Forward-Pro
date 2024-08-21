@@ -18,25 +18,25 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         public static List<EasyProbe> s_Probes = new();
         public static List<EasyProbeCell> s_ProbeCells = new();
         
-        public static NativeArray<float> s_ProbeCoefficientsFlatten;
-        public static NativeArray<float> s_ProbeCoefficients;
-        public static NativeArray<Vector3Int> s_ProbePosition;
-        public static NativeArray<float> s_ProbeAttenFlatten;
-        public static NativeArray<float> s_ProbeVisibilityFlatten;
-        public static NativeArray<EasyProbeLightSource> s_Lights;
-        
         public static int s_ProbeSpacing = 1;
         public static int s_ProbeCellSize = 2;
         public static int s_MaxProbeSpacing = 10;
         public static int s_MaxProbeCellSize = 30;
 
+        private static NativeArray<float> s_ProbeCoefficientsFlatten;
+        private static NativeArray<float> s_ProbeCoefficients;
+        private static NativeArray<Vector3Int> s_ProbePosition;
+        private static NativeArray<float> s_ProbeAttenFlatten;
+        private static NativeArray<float> s_ProbeVisibilityFlatten;
+        private static NativeArray<EasyProbeLightSource> s_Lights;
+        
         private static NativeArray<half4> s_SHAr; 
         private static NativeArray<half4> s_SHAg; 
         private static NativeArray<half4> s_SHAb; 
         private static NativeArray<half4> s_SHBr; 
         private static NativeArray<half4> s_SHBg; 
         private static NativeArray<half4> s_SHBb; 
-        private static NativeArray<half4> s_SHC; 
+        private static NativeArray<half4> s_SHC;
         
         public static void PlaceProbes()
         {
@@ -166,8 +166,15 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 );
                 combineHandle.Complete();
             }
-            
-            WriteOutput();
+
+            if (EasyProbeStreaming.s_DataStorageType == DataStorageType.Flatten)
+            {
+                WriteOutputFlatten();
+            }
+            else
+            {
+                WriteOutputPerCell();
+            }
             
             EasyProbeStreaming.Dispose();
         }
@@ -260,11 +267,11 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             s_SHC = new NativeArray<half4>(width * height * depth, Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
         }
-        
-        static void WriteOutput()
+
+        static void PrepareForOutputWriting(out Vector3 probeCountPerAxis, out Vector3Int cellMin, out Vector3Int cellMax)
         {
-            var cellMin = s_ProbeCells[0].Min;
-            var cellMax = s_ProbeCells[s_ProbeCells.Count - 1].Max;
+            cellMin = s_ProbeCells[0].Min;
+            cellMax = s_ProbeCells[s_ProbeCells.Count - 1].Max;
             var halfSize = s_ProbeSpacing / 2.0f;
             EasyProbeStreaming.s_ProbeVolumeWorldOffset = 
                 new Vector4(cellMin.x - halfSize, cellMin.y - halfSize, cellMin.z - halfSize, 1.0f);
@@ -274,14 +281,26 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 s_ProbeSpacing,
                 s_ProbeSpacing
             );
-            var probeCountPerAxis = EasyProbeStreaming.s_ProbeVolumeSize / s_ProbeSpacing;
+            
+            probeCountPerAxis = EasyProbeStreaming.s_ProbeVolumeSize / s_ProbeSpacing;
                 
             Debug.Assert(probeCountPerAxis.x * probeCountPerAxis.y * probeCountPerAxis.z == s_Probes.Count);
             AllocBufferData((int)probeCountPerAxis.x, (int)probeCountPerAxis.y, (int)probeCountPerAxis.z);    
             
             SeperateProbesComponent();
+        }
+        
+        static void WriteOutputPerCell()
+        {
+            PrepareForOutputWriting(out var probeCountPerAxis, out var cellMin, out var cellMax);
             
-            WriteBytes(probeCountPerAxis, cellMin, cellMax);
+        }
+        
+        static void WriteOutputFlatten()
+        {
+            PrepareForOutputWriting(out var probeCountPerAxis, out var cellMin, out var cellMax);
+            
+            WriteBytesFlatten(probeCountPerAxis, cellMin, cellMax);
         }
 
         static byte[] StructToBytes<T>(T obj) where T : struct
@@ -325,7 +344,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return byteArray;
         }
         
-        static void WriteBytes(Vector3 probeCountPerAxis, Vector3Int cellMin, Vector3Int cellMax)
+        static void WriteBytesFlatten(Vector3 probeCountPerAxis, Vector3Int cellMin, Vector3Int cellMax)
         {
             var probeCountPerCellAxis = s_ProbeCellSize / s_ProbeSpacing + 1;
             // metadata

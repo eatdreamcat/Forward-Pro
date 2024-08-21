@@ -35,7 +35,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         // // xy: L0L1 start,end; zw: L1 start,end
         // public Vector4 probeDataSliceLayout;
     }
-
+    
+    public enum DataStorageType
+    {
+        Flatten,
+        PerCell
+    }
+    
     public struct ProbeStreamingRequest
     {
         public int fileOffset;
@@ -110,6 +116,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         public static List<EasyCellData> s_CellDatas = new List<EasyCellData>();
         private static bool s_NeedReloadMetadata = true;
 
+        public static DataStorageType s_DataStorageType;
+        
         public static void SetMetadataDirty()
         {
             s_NeedReloadMetadata = true;

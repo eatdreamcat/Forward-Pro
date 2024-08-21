@@ -40,7 +40,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             
             internal static readonly GUIContent s_RandomLightColor = new GUIContent("Random Light Color");
             internal static readonly GUIContent s_SampleCount = new GUIContent("Sample Count");
-            internal static readonly GUIContent s_PointLightAttenuationConstant = new GUIContent("Point Light Attenuation Constant");
+            internal static readonly GUIContent s_DataStorageType = new GUIContent("Data Storage Type");
             internal static readonly GUIContent s_ProbeDebugType = new GUIContent("DebugDraw");
             internal static readonly GUIContent s_ProbeVolumeNoise = new GUIContent("Probe Sampling Noise");
             internal static readonly GUIContent s_ProbeVolumeIntensity = new GUIContent("Probe Shading Intensity");
@@ -303,6 +303,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
             // m_SampleDirDensity = (SampleDirDensity)EditorGUILayout.EnumPopup(Styles.s_SampleDirDensity, m_SampleDirDensity);
             m_SampleCount = (SampleCount)EditorGUILayout.EnumPopup(Styles.s_SampleCount, m_SampleCount);
+            EasyProbeStreaming.s_DataStorageType = (DataStorageType)EditorGUILayout.EnumPopup(Styles.s_DataStorageType,
+                EasyProbeStreaming.s_DataStorageType
+                );
             s_RandomLightColor = EditorGUILayout.Toggle(Styles.s_RandomLightColor, s_RandomLightColor);
             EditorGUILayout.Space();
 
@@ -484,7 +487,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 s_ShapeBox.DrawHull(EditMode.editMode == k_EditShape);
             }
 
-            if (EasyProbeSetup.Instance != null)
+            if (EasyProbeSetup.Instance != null && s_DebugStreaming)
             {
                 if (EasyProbeSetup.Instance.settings.sceneViewStreamingWithCustomBox)
                 {
@@ -626,7 +629,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 }
             }
 
-            if (EasyProbeSetup.Instance != null && EasyProbeSetup.Instance.settings.sceneViewStreamingWithCustomBox)
+            if (EasyProbeSetup.Instance != null 
+                && EasyProbeSetup.Instance.settings.sceneViewStreamingWithCustomBox && s_DebugStreaming)
             {
                 using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one)))
                 {
