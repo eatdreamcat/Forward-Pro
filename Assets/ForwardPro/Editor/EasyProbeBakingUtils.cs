@@ -203,9 +203,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     var level = coefficientIndex / 3;
                     var radianceEncoded = SHBasicFull(sampleDir, level) * BasicConstant(level) * radiance;
                     
-                    coefficients[probeCoefficientBaseIndex + sampleIndex * 27 + coefficientIndex] = radianceEncoded.r;
-                    coefficients[probeCoefficientBaseIndex + sampleIndex * 27 + coefficientIndex + 1] = radianceEncoded.g;
-                    coefficients[probeCoefficientBaseIndex + sampleIndex * 27 + coefficientIndex + 2] = radianceEncoded.b;
+                    coefficients[probeCoefficientBaseIndex + sampleIndex * 27 + coefficientIndex] += radianceEncoded.r;
+                    coefficients[probeCoefficientBaseIndex + sampleIndex * 27 + coefficientIndex + 1] += radianceEncoded.g;
+                    coefficients[probeCoefficientBaseIndex + sampleIndex * 27 + coefficientIndex + 2] += radianceEncoded.b;
                 }
             }
                 
