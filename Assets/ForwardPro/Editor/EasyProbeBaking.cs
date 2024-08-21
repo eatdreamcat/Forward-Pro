@@ -18,9 +18,15 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         public static List<EasyProbe> s_Probes = new();
         public static List<EasyProbeCell> s_ProbeCells = new();
         
-        public static int s_ProbeSpacing = 2;
-        public static int s_ProbeCellSize = 6;
-        public static float s_PointAttenConstantK = 0.1f;
+        public static NativeArray<float> s_ProbeCoefficientsFlatten;
+        public static NativeArray<float> s_ProbeCoefficients;
+        public static NativeArray<Vector3Int> s_ProbePosition;
+        public static NativeArray<float> s_ProbeAttenFlatten;
+        public static NativeArray<float> s_ProbeVisibilityFlatten;
+        public static NativeArray<EasyProbeLightSource> s_Lights;
+        
+        public static int s_ProbeSpacing = 1;
+        public static int s_ProbeCellSize = 2;
         public static int s_MaxProbeSpacing = 10;
         public static int s_MaxProbeCellSize = 30;
 
@@ -94,38 +100,72 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             DeleteDirectory(output);
             Directory.CreateDirectory(output);
             AssetDatabase.Refresh();
-
+            
             {
-                var coefficients = new NativeArray<float>(27 * s_Probes.Count, Allocator.TempJob,
+                if (s_ProbeCoefficientsFlatten.IsCreated)
+                {
+                    s_ProbeCoefficientsFlatten.Dispose();
+                }
+                
+                s_ProbeCoefficientsFlatten = new NativeArray<float>(27 * s_Probes.Count * sampleCount, Allocator.Persistent,
                     NativeArrayOptions.UninitializedMemory);
-                var probePosition = new NativeArray<Vector3Int>(s_Probes.Count, Allocator.TempJob,
+
+                if (s_ProbePosition.IsCreated)
+                {
+                    s_ProbePosition.Dispose();
+                }
+                
+                s_ProbePosition = new NativeArray<Vector3Int>(s_Probes.Count, Allocator.Persistent,
                     NativeArrayOptions.UninitializedMemory);
                 for (int i = 0; i < s_Probes.Count; ++i)
                 {
-                    probePosition[i] = s_Probes[i].position;
+                    s_ProbePosition[i] = s_Probes[i].position;
                 }
-                var probeAtten = new NativeArray<float>(s_Probes.Count, Allocator.TempJob);
-                var probeVisibility = new NativeArray<float>(s_Probes.Count, Allocator.TempJob);
+                s_ProbeAttenFlatten = new NativeArray<float>(s_Probes.Count * lightSources.Count, Allocator.Persistent);
+                s_ProbeVisibilityFlatten = new NativeArray<float>(s_Probes.Count * lightSources.Count, Allocator.Persistent);
+
+                if (s_Lights.IsCreated)
+                {
+                    s_Lights.Dispose();
+                }
                 
-                var lights = new NativeArray<EasyProbeLightSource>(lightSources.Count, Allocator.TempJob,
+                s_Lights = new NativeArray<EasyProbeLightSource>(lightSources.Count, Allocator.Persistent,
                     NativeArrayOptions.UninitializedMemory);
 
                 for (int i = 0; i < lightSources.Count; ++i)
                 {
-                    lights[i] = lightSources[i];
+                    s_Lights[i] = lightSources[i];
                 }
 
                 var bakingHandle = EasyProbeBakingJob.BakingProbe(
-                    ref  coefficients,
-                    ref  probeAtten,
-                    ref  probeVisibility,
-                    ref  probePosition,
-                    ref lights
+                    s_ProbeCoefficientsFlatten,
+                    s_ProbeAttenFlatten,
+                    s_ProbeVisibilityFlatten,
+                    s_ProbePosition,
+                    s_Lights,
+                    s_Probes.Count,
+                    sampleCount
                     );
+                
                 bakingHandle.Complete();
+
+                if (s_ProbeCoefficients.IsCreated)
+                {
+                    s_ProbeCoefficients.Dispose();
+                }
+                
+                s_ProbeCoefficients = new NativeArray<float>(27 * s_Probes.Count, Allocator.Persistent,
+                    NativeArrayOptions.UninitializedMemory);
+                
+                var combineHandle = EasyProbeBakingJob.CombineProbeData(
+                    s_Probes.Count, sampleCount,
+                    s_ProbeCoefficientsFlatten,
+                    s_ProbeCoefficients
+                );
+                combineHandle.Complete();
             }
             
-            // WriteOutput();
+            WriteOutput();
             
             EasyProbeStreaming.Dispose();
         }
@@ -177,67 +217,45 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             });
         }
         
-        static void FlattenProbes()
+        static void SeperateProbesComponent()
         {
-            for(int i = 0; i < s_Probes.Count; ++i)
-            {
-                // l0l1
-                var probe = s_Probes[i];
-                var l0r = (half)probe.coefficients[0];
-                var l1r0 = (half)probe.coefficients[3];
-                var l1r1 = (half)probe.coefficients[6];
-                var l1r2 = (half)probe.coefficients[9];
-                s_SHAr[i] = new half4(l1r0, l1r1, l1r2, l0r);
-                var l0g = (half)probe.coefficients[1];
-                var l1g0 = (half)probe.coefficients[4];
-                var l1g1 = (half)probe.coefficients[7];
-                var l1g2 = (half)probe.coefficients[10];
-                s_SHAg[i] = new half4(l1g0, l1g1, l1g2, l0g);
-                var l0b = (half)probe.coefficients[2];
-                var l1b0 = (half)probe.coefficients[5];
-                var l1b1 = (half)probe.coefficients[8];
-                var l1b2 = (half)probe.coefficients[11];
-                s_SHAb[i] = new half4(l1b0, l1b1, l1b2, l0b);
-                // l2
-                var l2_1thxyr = (half)probe.coefficients[12];
-                var l2_1thyzr = (half)probe.coefficients[15];
-                var l2_1thzzr = (half)probe.coefficients[18];
-                var l2_1thzxr = (half)probe.coefficients[21];
-                s_SHBr[i] = new half4(l2_1thxyr, l2_1thyzr, l2_1thzzr, l2_1thzxr);
-                var l2_1thxyg = (half)probe.coefficients[13];
-                var l2_1thyzg = (half)probe.coefficients[16];
-                var l2_1thzzg = (half)probe.coefficients[19];
-                var l2_1thzxg = (half)probe.coefficients[22];
-                s_SHBg[i] = new half4(l2_1thxyg, l2_1thyzg, l2_1thzzg, l2_1thzxg);
-                var l2_1thxyb = (half)probe.coefficients[14];
-                var l2_1thyzb = (half)probe.coefficients[17];
-                var l2_1thzzb = (half)probe.coefficients[20];
-                var l2_1thzxb = (half)probe.coefficients[23];
-                s_SHBb[i] = new half4(l2_1thxyb, l2_1thyzb, l2_1thzzb, l2_1thzxb);
-                var l2_5thr = (half)probe.coefficients[24];
-                var l2_5thg = (half)probe.coefficients[25];
-                var l2_5thb = (half)probe.coefficients[26];
-                
-                s_SHC[i] = new half4(l2_5thr, l2_5thg, l2_5thb,(half)1.0f);
-            }
+            var handle = EasyProbeBakingJob.SeperateProbeComponent(
+                s_SHAr,
+                s_SHAg,
+                s_SHAb,
+                s_SHBr,
+                s_SHBg,
+                s_SHBb,
+                s_SHC,
+                s_ProbeCoefficients,
+                s_Probes.Count
+            );
             
+            handle.Complete();
         }
 
-        static void AllocTempBufferData(int width, int height, int depth)
+        static void AllocBufferData(int width, int height, int depth)
         {
-            s_SHAr = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            if (s_SHAr.IsCreated) s_SHAr.Dispose();
+            s_SHAr = new NativeArray<half4>(width * height * depth, Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
-            s_SHAg = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            if (s_SHAg.IsCreated) s_SHAg.Dispose();
+            s_SHAg = new NativeArray<half4>(width * height * depth, Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
-            s_SHAb = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            if (s_SHAb.IsCreated) s_SHAb.Dispose();
+            s_SHAb = new NativeArray<half4>(width * height * depth, Allocator.Persistent,
                             NativeArrayOptions.UninitializedMemory);
-            s_SHBr = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            if (s_SHBr.IsCreated) s_SHBr.Dispose();
+            s_SHBr = new NativeArray<half4>(width * height * depth, Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
-            s_SHBg = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            if (s_SHBg.IsCreated) s_SHBg.Dispose();
+            s_SHBg = new NativeArray<half4>(width * height * depth, Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
-            s_SHBb = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            if (s_SHBb.IsCreated) s_SHBb.Dispose();
+            s_SHBb = new NativeArray<half4>(width * height * depth, Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
-            s_SHC = new NativeArray<half4>(width * height * depth, Allocator.Temp,
+            if (s_SHC.IsCreated) s_SHC.Dispose();
+            s_SHC = new NativeArray<half4>(width * height * depth, Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
         }
         
@@ -260,9 +278,10 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             var probeCountPerAxis = EasyProbeStreaming.s_ProbeVolumeSize / s_ProbeSpacing;
                 
             Debug.Assert(probeCountPerAxis.x * probeCountPerAxis.y * probeCountPerAxis.z == s_Probes.Count);
-            AllocTempBufferData((int)probeCountPerAxis.x, (int)probeCountPerAxis.y, (int)probeCountPerAxis.z);    
+            AllocBufferData((int)probeCountPerAxis.x, (int)probeCountPerAxis.y, (int)probeCountPerAxis.z);    
             
-            FlattenProbes();
+            SeperateProbesComponent();
+            
             WriteBytes(probeCountPerAxis, cellMin, cellMax);
         }
 
@@ -411,12 +430,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                             cellSlice,
                             i
                             ),
-                        // probeDataPerSliceLayoutL0L1 = new Vector4(
-                        //     ),
-                        // probeDataPerSliceLayoutL2 = new Vector4(
-                        //     ),
-                        // probeDataSliceLayout = new Vector4(
-                        //     )
                     });
                 }
 
@@ -425,6 +438,21 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 File.WriteAllBytes(path, bytesToWrite);
                 Debug.Log("[EasyProbeBaking](WriteBytes): cell data written to " + path);
             }
+
+            if (s_ProbeCoefficientsFlatten.IsCreated) s_ProbeCoefficientsFlatten.Dispose();
+            if (s_ProbeCoefficients.IsCreated) s_ProbeCoefficients.Dispose();
+            if (s_ProbeAttenFlatten.IsCreated) s_ProbeAttenFlatten.Dispose();
+            if (s_ProbeVisibilityFlatten.IsCreated) s_ProbeVisibilityFlatten.Dispose();
+            if (s_Lights.IsCreated) s_Lights.Dispose();
+            if (s_ProbePosition.IsCreated) s_ProbePosition.Dispose();
+
+            if (s_SHAr.IsCreated) s_SHAr.Dispose();
+            if (s_SHAg.IsCreated) s_SHAg.Dispose();
+            if (s_SHAb.IsCreated) s_SHAb.Dispose();
+            if (s_SHBr.IsCreated) s_SHBr.Dispose();
+            if (s_SHBg.IsCreated) s_SHBg.Dispose();
+            if (s_SHBb.IsCreated) s_SHBb.Dispose();
+            if (s_SHC.IsCreated) s_SHC.Dispose();
             
             AssetDatabase.Refresh();
         }

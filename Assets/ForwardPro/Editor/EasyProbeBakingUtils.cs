@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 using Unity.Collections;
 using UnityEngine;
 
@@ -8,7 +9,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
     public static class EasyProbeBakingUtils 
     {
         private static readonly float INV_PI = 1 / 3.14159265359f;
-        private static readonly float PI =  3.14159265359f;
+        // private static readonly float PI =  3.14159265359f;
         private static readonly float TWO_PI = 3.14159265359f * 2;
         
         public static float BasicConstant(int level)
@@ -159,25 +160,29 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         
         
         public static void BakeProbe(EasyProbeLightSource lightSource, Vector3 probePosition, 
-            ref NativeArray<float> atten, ref NativeArray<float> probevisibility, ref NativeArray<float> coefficients,
-            int sampleCount, int probeIndex)
+            NativeArray<float> atten, NativeArray<float> probevisibility, NativeArray<float> coefficients,
+            int sampleCount, int probeIndex, int lightIndex, int lightCount)
         {
             var dirToLight = lightSource.lightPosition - probePosition;
             var lightAtten =
-                CalculatePointLightAttenuation(dirToLight.sqrMagnitude, lightSource.lightRange, EasyProbeBaking.s_PointAttenConstantK);
+                CalculatePointLightAttenuation(dirToLight.sqrMagnitude, lightSource.lightRange, 0.1f);
             lightAtten *= lightSource.lightIntensity;
-            atten[probeIndex] = Mathf.Max(lightAtten, atten[probeIndex]);
+            atten[probeIndex * lightCount + lightIndex] = lightAtten;
             
             var visibilty = 1.0f;
-            Ray ray = new Ray(probePosition, dirToLight.normalized);
-            if (Physics.Raycast(ray, dirToLight.magnitude))
-            {
-                visibilty = 0.0f;
-            }
-            probevisibility[probeIndex] = Mathf.Max(probevisibility[probeIndex], visibilty);
+           
+            // TODO: Raycast only supported on main thread
+            // Ray ray = new Ray(probePosition, dirToLight.normalized);
+            // if (Physics.Raycast(ray, dirToLight.magnitude))
+            // {
+            //     visibilty = 0.0f;
+            // }
+            probevisibility[probeIndex * lightCount + lightIndex] = visibilty;
             
-         
             var dir = dirToLight.normalized;
+            
+            int probeCoefficientBaseIndex = probeIndex * 27 * sampleCount;
+            
             for (int sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
             {
                 var sampleDir = GetCosineWeightedRandomDirection(
@@ -191,21 +196,16 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 var radiance = SampleLight(sampleDir, probePosition, lightSource, lightSource.isRandomColor ? 
                     new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f), 1.0f) : lightSource.lightColor) 
                     * lightAtten * visibilty / pdf / sampleCount;
-
-                int probeCoefficientBaseIndex = probeIndex * 27;
+                
                 // probe.coefficients.Count = 27
                 for (int coefficientIndex = 0; coefficientIndex < 27; coefficientIndex += 3)
                 {
                     var level = coefficientIndex / 3;
-                    coefficients[probeCoefficientBaseIndex + coefficientIndex] +=
-                        SHBasicFull(sampleDir, level) * radiance.r *
-                        BasicConstant(level);
-                    coefficients[probeCoefficientBaseIndex + coefficientIndex + 1] +=
-                        SHBasicFull(sampleDir, level) * radiance.g *
-                        BasicConstant(level);
-                    coefficients[probeCoefficientBaseIndex + coefficientIndex + 2] +=
-                        SHBasicFull(sampleDir, level) * radiance.b *
-                        BasicConstant(level);
+                    var radianceEncoded = SHBasicFull(sampleDir, level) * BasicConstant(level) * radiance;
+                    
+                    coefficients[probeCoefficientBaseIndex + sampleIndex * 27 + coefficientIndex] = radianceEncoded.r;
+                    coefficients[probeCoefficientBaseIndex + sampleIndex * 27 + coefficientIndex + 1] = radianceEncoded.g;
+                    coefficients[probeCoefficientBaseIndex + sampleIndex * 27 + coefficientIndex + 2] = radianceEncoded.b;
                 }
             }
                 

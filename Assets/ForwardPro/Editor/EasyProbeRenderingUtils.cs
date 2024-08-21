@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Collections;
 using UnityEngine;
 
 namespace UnityEngine.Rendering.EasyProbeVolume
@@ -22,47 +23,60 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         */
         public static Vector4[] s_PackedCoefficients = new Vector4[k_PackedCoefficientCount];
         
-        public static void PackAndPushCoefficients(Material material, EasyProbe probe, EasyProbeVolume volume)
+        public static void PackAndPushCoefficients(
+            Material material, EasyProbeVolume volume,
+            ref NativeArray<float> probeAtten,
+            ref NativeArray<float> probeVisibility,
+            ref NativeArray<float> coefficients,
+            int probeIndex)
         {
+
+            if (coefficients.IsCreated == false || probeAtten.IsCreated == false || probeVisibility.IsCreated == false)
+            {
+                return;
+            }
             
             #if UNITY_EDITOR
             
-            material.SetFloat(_ProbeAtten, probe.atten);
-            material.SetFloat(_Visiablity, probe.visibilty);
+            material.SetFloat(_ProbeAtten, probeAtten[probeIndex]);
+            material.SetFloat(_Visiablity, probeVisibility[probeIndex]);
             material.SetVector(_VolumeSize, volume.volumeSize);
             
             #endif
-            
+
+            var baseIndex = probeIndex * 27;
             // L0L1
             for (int i = 0; i < 3; ++i)
             {
-                var L1 = i + 3;
+                var index = i + baseIndex;
+                var L1 = index + 3;
                 s_PackedCoefficients[i] = new Vector4(
-                    probe.coefficients[L1], // L1 shAr  shAg  shAg
-                    probe.coefficients[L1 + 3], 
-                    probe.coefficients[L1 + 6], 
-                    probe.coefficients[i] // L0: RGB
+                    coefficients[L1], // L1 shAr  shAg  shAg
+                    coefficients[L1 + 3], 
+                    coefficients[L1 + 6], 
+                    coefficients[index] // L0: RGB
                 );
             }
 
             // L2
             for (int i = 3; i < k_PackedCoefficientCount - 1; ++i)
             {
-                var L2 = 9 + i;
+                var index = i + baseIndex;
+                var L2 = 9 + index;
                 s_PackedCoefficients[i] = new Vector4(
-                    probe.coefficients[L2], // L2 RGB 1th xx
-                    probe.coefficients[L2 + 3], // L2 RGB 2th yz
-                    probe.coefficients[L2 + 6], // L2 RGB 3th zz
-                    probe.coefficients[L2 + 9]  // L2 RGB 4th zx
+                    coefficients[L2], // L2 RGB 1th xx
+                    coefficients[L2 + 3], // L2 RGB 2th yz
+                    coefficients[L2 + 6], // L2 RGB 3th zz
+                    coefficients[L2 + 9]  // L2 RGB 4th zx
                 );
                 
             }
             
             // final 5th quadratic in L2
             s_PackedCoefficients[k_PackedCoefficientCount - 1] = new Vector4(
-                probe.coefficients[24],
-                probe.coefficients[25],
-                probe.coefficients[26],
+                coefficients[baseIndex + 24],
+                coefficients[baseIndex + 25],
+                coefficients[baseIndex + 26],
                 1.0f
                 );
             

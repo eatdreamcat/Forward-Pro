@@ -1,3 +1,4 @@
+using Unity.Collections;
 using UnityEditor;
 
 namespace UnityEngine.Rendering.EasyProbeVolume
@@ -20,9 +21,16 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         /// <summary>The size of the box in Handle.matrix space.</summary>
         public float radius { get; set; }
         
-        public void DrawProbe(EasyProbe probe, EasyProbeVolume volume, EasyProbeVolumeEditor.ProbeDebug probeDebug)
+        public void DrawProbe(ref NativeArray<float> probeAtten,
+            ref NativeArray<float> probeVisibility,
+            ref NativeArray<float> coefficients,
+            int probeIndex,
+            EasyProbeVolume volume, EasyProbeVolumeEditor.ProbeDebug probeDebug)
         {
-            EasyProbeRenderingUtils.PackAndPushCoefficients(material, probe, volume);
+            EasyProbeRenderingUtils.PackAndPushCoefficients(material, volume, ref probeAtten,
+                 ref probeVisibility,
+                 ref coefficients,
+                 probeIndex);
             switch (probeDebug)
             {
                 case EasyProbeVolumeEditor.ProbeDebug.Diffuse:

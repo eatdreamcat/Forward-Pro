@@ -304,9 +304,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             // m_SampleDirDensity = (SampleDirDensity)EditorGUILayout.EnumPopup(Styles.s_SampleDirDensity, m_SampleDirDensity);
             m_SampleCount = (SampleCount)EditorGUILayout.EnumPopup(Styles.s_SampleCount, m_SampleCount);
             s_RandomLightColor = EditorGUILayout.Toggle(Styles.s_RandomLightColor, s_RandomLightColor);
-            EasyProbeBaking.s_PointAttenConstantK =
-                EditorGUILayout.Slider(Styles.s_PointLightAttenuationConstant, EasyProbeBaking.s_PointAttenConstantK,
-                    0.01f, 0.1f);
             EditorGUILayout.Space();
 
             s_DisplayCell = EditorGUILayout.Toggle(Styles.s_DisplayCell, s_DisplayCell);
@@ -511,15 +508,15 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 // Draw Probe
                 if (s_DisplayProbe)
                 {
-                    foreach (var probe in EasyProbeBaking.s_Probes)
-                    {
-                        using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one)))
-                        {
-                            s_ProbeSphere.center = probe.position;
-                            s_ProbeSphere.radius = s_ProbeRadius;
-                            s_ProbeSphere.DrawProbe(probe, probeVolume, s_DebugDraw);
-                        }
-                    }
+                    // foreach (var probe in EasyProbeBaking.s_Probes)
+                    // {
+                    //     using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one)))
+                    //     {
+                    //         s_ProbeSphere.center = probe.position;
+                    //         s_ProbeSphere.radius = s_ProbeRadius;
+                    //         s_ProbeSphere.DrawProbe(probe, probeVolume, s_DebugDraw);
+                    //     }
+                    // }
                 }
             }
             

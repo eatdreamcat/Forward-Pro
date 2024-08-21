@@ -1,4 +1,5 @@
 using System;
+using UnityEditor.SceneManagement;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 
@@ -96,10 +97,24 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             m_ScriptablePass.renderPassEvent = RenderPassEvent.BeforeRendering;
             SceneManager.sceneLoaded -= OnSceneLoaded;
             SceneManager.sceneLoaded += OnSceneLoaded;
+
+#if UNITY_EDITOR
+            EditorSceneManager.sceneOpened -= OnSceneOpened;
+            EditorSceneManager.sceneOpened += OnSceneOpened;
+#endif
         }
 
+#if UNITY_EDITOR
+
+        void OnSceneOpened(Scene scene, OpenSceneMode mode)
+        {
+            Shader.SetGlobalFloat(EasyProbeSetupPass._EasyProbeToggle, 0.0f);
+            EasyProbeStreaming.SetMetadataDirty();
+        }
+#endif
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
+            Shader.SetGlobalFloat(EasyProbeSetupPass._EasyProbeToggle, 0.0f);
             EasyProbeStreaming.SetMetadataDirty();
         }
 
@@ -122,6 +137,10 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
             s_Instance = null;
             SceneManager.sceneLoaded -= OnSceneLoaded;
+            
+#if UNITY_EDITOR
+            EditorSceneManager.sceneOpened -= OnSceneOpened;
+#endif
         }
     }
 
