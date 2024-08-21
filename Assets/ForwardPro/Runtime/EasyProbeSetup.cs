@@ -36,6 +36,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             public bool enableStreaming;
             
 #if UNITY_EDITOR
+            public BytesLoader.LoaderType loaderType;
             [HideInInspector]
             public bool sceneViewStreamingWithCustomBox;
             [HideInInspector]
@@ -125,7 +126,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             Shader.SetGlobalFloat(EasyProbeSetupPass._EasyProbeToggle, 0.0f);
             if (EasyProbeVolume.s_ProbeVolumes.Count > 0)
             {
-                BytesLoader.SetLoaderType(BytesLoader.LoaderType.MemoryMappedFile);
+                BytesLoader.SetLoaderType(settings.loaderType);
                 renderer.EnqueuePass(m_ScriptablePass);
             }
         }
