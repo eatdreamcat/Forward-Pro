@@ -48,12 +48,15 @@
     <Compile Include="Assets\ForwardPro\Runtime\EasyProbeSetup.cs" />
     <Compile Include="Assets\StarterAssets\Mobile\Scripts\CanvasInputs\UICanvasControllerInput.cs" />
     <Compile Include="Assets\ForwardPro\Runtime\EasyProbeVolume.cs" />
+    <Compile Include="Assets\ForwardPro\Runtime\BytesLoader.MemoryMappedFile.cs" />
     <Compile Include="Assets\StarterAssets\TutorialInfo\Scripts\Readme.cs" />
     <Compile Include="Assets\StarterAssets\Mobile\Scripts\VirtualInputs\UIVirtualTouchZone.cs" />
     <Compile Include="Assets\StarterAssets\Mobile\Scripts\VirtualInputs\UIVirtualButton.cs" />
+    <Compile Include="Assets\ForwardPro\Runtime\BytesLoader.cs" />
     <Compile Include="Assets\ForwardPro\Runtime\EasyProbeStreaming.cs" />
     <Compile Include="Assets\StarterAssets\Mobile\Scripts\VirtualInputs\UIVirtualJoystick.cs" />
     <Compile Include="Assets\StarterAssets\Mobile\Scripts\Utilities\MobileDisableAutoSwitchControls.cs" />
+    <Compile Include="Assets\ForwardPro\Runtime\BytesLoader.FileStream.cs" />
     <Compile Include="Assets\StarterAssets\ThirdPersonController\Scripts\BasicRigidBodyPush.cs" />
     <Compile Include="Assets\ForwardPro\Samples\Garden\Scripts\Runtime\DynamicLightController.cs" />
     <Compile Include="Assets\StarterAssets\InputSystem\StarterAssetsInputs.cs" />

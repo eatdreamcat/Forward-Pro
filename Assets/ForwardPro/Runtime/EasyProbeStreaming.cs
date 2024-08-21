@@ -139,15 +139,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         private static ProbeVolumeSHBands s_Bands;
         
         private const int k_BytesPerHalf4 = 8;
-        
-        struct FileStreamKey
-        {
-            public FileAccess access;
-            public FileMode mode;
-            public string path;
-        }
-        
-        private static Dictionary<FileStreamKey, FileStream> s_FileStreamMap = new();
         private static byte[] s_MetadataBuffer;
         
         static bool AllocBufferDataIfNeeded(ref Texture probeRT, ref byte[] sh,
@@ -376,35 +367,16 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             var depth = (metaData.probeCountPerCellAxis - 1) * (boxMax.z - boxMin.z) / metaData.cellSize + 1;
             return new Vector3Int(width, height, depth);
         }
-
-        static FileStream GetFileStream(string path, FileMode mode, FileAccess access)
-        {
-            var key = new FileStreamKey()
-            {
-                path = path,
-                mode = mode,
-                access = access
-            };
-
-            if (!s_FileStreamMap.TryGetValue(key, out var fileStream))
-            {
-                fileStream = new FileStream(path, mode, access);
-                s_FileStreamMap.Add(key, fileStream);
-            }
-            
-            fileStream.Flush();
-            return fileStream;
-        }
-
-        static bool LoadSHBytes(FileStream fileStream, List<ProbeStreamingRequest> requests, ref byte[] buffer, out int totalReadBytes)
+        
+        static bool LoadSHBytes(string filePath, List<ProbeStreamingRequest> requests, ref byte[] buffer, out int totalReadBytes)
         {
             totalReadBytes = 0;
             for (int i = 0; i < requests.Count; ++i)
             {
                 var request = requests[i];
-                if (!ReadBytesFromRelativePath(fileStream, ref buffer, request.bufferOffset, request.fileOffset, request.length, out var bytes))
+                if (!BytesLoader.LoadBytes(filePath, ref buffer, request.bufferOffset, request.fileOffset, request.length, out var bytes))
                 {
-                    Debug.LogError($"[EasyProbeStreaming](ProcessStreaming): failed to load sh data {fileStream.Name} at offset {request.fileOffset}");
+                    Debug.LogError($"[EasyProbeStreaming](ProcessStreaming): failed to load sh data {filePath} at offset {request.fileOffset}");
                     return false;
                 }
 
@@ -553,20 +525,18 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             currentScenePath = currentScenePath.Substring(0, lastIndexOfSep);
 
             var filePath = currentScenePath + s_L0L1DataPath;
-
-            var fileStream = GetFileStream(filePath, FileMode.Open, FileAccess.Read);
-          
-            if (!LoadSHBytes(fileStream, s_SHArRequests, ref s_SHAr, out var shArBytes))
+            
+            if (!LoadSHBytes(filePath, s_SHArRequests, ref s_SHAr, out var shArBytes))
             {
                 return false;
             }
             
-            if (!LoadSHBytes(fileStream, s_SHAgRequests, ref s_SHAg, out var shAgBytes))
+            if (!LoadSHBytes(filePath, s_SHAgRequests, ref s_SHAg, out var shAgBytes))
             {
                 return false;
             }
             
-            if (!LoadSHBytes(fileStream, s_SHAbRequests, ref s_SHAb, out var shAbBytes))
+            if (!LoadSHBytes(filePath, s_SHAbRequests, ref s_SHAb, out var shAbBytes))
             {
                 return false;
             }
@@ -643,8 +613,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
                 // L0L1
                 var filePath = currentScenePath + s_L0L1DataPath;
-                var fileStream = GetFileStream(filePath, FileMode.Open, FileAccess.Read);
-                if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
+                if (!LoadSHBytes(filePath, new List<ProbeStreamingRequest>()
                     {
                         new ProbeStreamingRequest()
                         {
@@ -658,7 +627,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     return false;
                 }
                 
-                if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
+                if (!LoadSHBytes(filePath, new List<ProbeStreamingRequest>()
                     {
                         new ProbeStreamingRequest()
                         {
@@ -672,7 +641,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                     return false;
                 }
                 
-                if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
+                if (!LoadSHBytes(filePath, new List<ProbeStreamingRequest>()
                     {
                         new ProbeStreamingRequest()
                         {
@@ -691,8 +660,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 if (EasyProbeSetup.Instance.settings.band == EasyProbeSetup.SHBand.L2)
                 {
                     filePath = currentScenePath + s_L2DataPath;
-                    fileStream = GetFileStream(filePath, FileMode.Open, FileAccess.Read);
-                    if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
+                    if (!LoadSHBytes(filePath, new List<ProbeStreamingRequest>()
                         {
                             new ProbeStreamingRequest()
                             {
@@ -706,7 +674,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                         return false;
                     }
                 
-                    if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
+                    if (!LoadSHBytes(filePath, new List<ProbeStreamingRequest>()
                         {
                             new ProbeStreamingRequest()
                             {
@@ -720,7 +688,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                         return false;
                     }
                 
-                    if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
+                    if (!LoadSHBytes(filePath, new List<ProbeStreamingRequest>()
                         {
                             new ProbeStreamingRequest()
                             {
@@ -734,7 +702,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                         return false;
                     }
                 
-                    if (!LoadSHBytes(fileStream, new List<ProbeStreamingRequest>()
+                    if (!LoadSHBytes(filePath, new List<ProbeStreamingRequest>()
                         {
                             new ProbeStreamingRequest()
                             {
@@ -991,15 +959,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
             s_NeedReloadMetadata = true;
 
-            foreach (var keyValue in s_FileStreamMap)
-            {
-                if (keyValue.Value != null)
-                {
-                    keyValue.Value.Dispose();
-                }
-            }
-            
-            s_FileStreamMap.Clear();
+            BytesLoader.Dispose();
             
         }
     }

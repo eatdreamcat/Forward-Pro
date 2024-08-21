@@ -34,7 +34,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             public SHBand band;
             public MemoryBudget budget;
             public bool enableStreaming;
-
+            
 #if UNITY_EDITOR
             [HideInInspector]
             public bool sceneViewStreamingWithCustomBox;
@@ -125,6 +125,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             Shader.SetGlobalFloat(EasyProbeSetupPass._EasyProbeToggle, 0.0f);
             if (EasyProbeVolume.s_ProbeVolumes.Count > 0)
             {
+                BytesLoader.SetLoaderType(BytesLoader.LoaderType.MemoryMappedFile);
                 renderer.EnqueuePass(m_ScriptablePass);
             }
         }
