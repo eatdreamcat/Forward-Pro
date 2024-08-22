@@ -46,6 +46,29 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             
         }
         
+        public static JobHandle BakingProbe(
+            NativeArray<float> coefficients,
+            NativeArray<float> probeAtten,
+            NativeArray<float> probeVisiable,
+            NativeArray<Vector3Int> probePosition,
+            NativeArray<EasyProbeLightSource> lightSources,
+            int probeCount,
+            int sampleCount
+            )
+        {
+            BakingJob job = new BakingJob
+            {
+                coefficients = coefficients,
+                probeAtten = probeAtten,
+                probeVisiable = probeVisiable,
+                probePosition = probePosition,
+                lightSources = lightSources,
+                sampleCount = sampleCount,
+            };
+            
+            return job.Schedule(probeCount, lightSources.Length);
+        }
+
         [BurstCompile]
         struct ProbeComponentSeperateJob : IJobParallelFor
         {
@@ -100,7 +123,36 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             }
         }
         
-        [BurstCompile]
+       
+        public static JobHandle SeperateProbeComponent(
+            NativeArray<half4> shArDst,
+            NativeArray<half4> shAgDst,
+            NativeArray<half4> shAbDst,
+            NativeArray<half4> shBrDst,
+            NativeArray<half4> shBgDst,
+            NativeArray<half4> shBbDst,
+            NativeArray<half4> shCDst,
+            NativeArray<float> coefficientSrc,
+            int probeCount
+        )
+        {
+            ProbeComponentSeperateJob job = new ProbeComponentSeperateJob()
+            {
+                shArDst = shArDst,
+                shAgDst = shAgDst,
+                shAbDst = shAbDst,
+                shBrDst = shBrDst,
+                shBgDst = shBgDst,
+                shBbDst = shBbDst,
+                shCDst = shCDst,
+                coefficientSrc = coefficientSrc,
+            };
+            
+            return job.Schedule(probeCount, 64);
+        }
+        
+        
+         [BurstCompile]
         struct CombinedProbeJob : IJobParallelFor
         {
             [ReadOnly]
@@ -134,30 +186,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 
             }
         }
-
-        public static JobHandle BakingProbe(
-            NativeArray<float> coefficients,
-            NativeArray<float> probeAtten,
-            NativeArray<float> probeVisiable,
-            NativeArray<Vector3Int> probePosition,
-            NativeArray<EasyProbeLightSource> lightSources,
-            int probeCount,
-            int sampleCount
-            )
-        {
-            BakingJob job = new BakingJob
-            {
-                coefficients = coefficients,
-                probeAtten = probeAtten,
-                probeVisiable = probeVisiable,
-                probePosition = probePosition,
-                lightSources = lightSources,
-                sampleCount = sampleCount,
-            };
-            
-            return job.Schedule(probeCount, lightSources.Length);
-        }
-
         public static JobHandle CombineProbeData(
             int probeCount, int sampleCount,
             NativeArray<float> coefficientFlattenSrc,
@@ -173,33 +201,109 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
             return job.Schedule(probeCount, 64);
         }
-        
-        public static JobHandle SeperateProbeComponent(
-            NativeArray<half4> shArDst,
-            NativeArray<half4> shAgDst,
-            NativeArray<half4> shAbDst,
-            NativeArray<half4> shBrDst,
-            NativeArray<half4> shBgDst,
-            NativeArray<half4> shBbDst,
-            NativeArray<half4> shCDst,
-            NativeArray<float> coefficientSrc,
-            int probeCount
-        )
+
+        [BurstCompile]
+        struct FattenDataToPerCellDataJob : IJobParallelFor
         {
-            ProbeComponentSeperateJob job = new ProbeComponentSeperateJob()
-            {
-                shArDst = shArDst,
-                shAgDst = shAgDst,
-                shAbDst = shAbDst,
-                shBrDst = shBrDst,
-                shBgDst = shBgDst,
-                shBbDst = shBbDst,
-                shCDst = shCDst,
-                coefficientSrc = coefficientSrc,
-            };
+            public int cellCountPerSlice;
+            public int cellCountPerLine;
+            public int probeCountPerCellAxis;
+            public Vector3Int probeCountPerVolumeAxis;
             
-            return job.Schedule(probeCount, 64);
+            [ReadOnly]
+            public NativeArray<half4> shAr;
+            [ReadOnly]
+            public NativeArray<half4> shAg;
+            [ReadOnly]
+            public NativeArray<half4> shAb;
+            [ReadOnly]
+            public NativeArray<half4> shBr;
+            [ReadOnly]
+            public NativeArray<half4> shBg;
+            [ReadOnly]
+            public NativeArray<half4> shBb;
+            [ReadOnly]
+            public NativeArray<half4> shC;
+
+            [NativeDisableContainerSafetyRestrictionAttribute]
+            public NativeArray<half4> l0l1PerCell;
+            [NativeDisableContainerSafetyRestrictionAttribute]
+            public NativeArray<half4> l2PerCell;
+            
+            public void Execute(int cellIndex)
+            {
+                var sliceIndex = cellIndex / cellCountPerSlice;
+                var rowIndex = (cellIndex - (sliceIndex * cellCountPerSlice)) / cellCountPerLine;
+                var columnIndex = cellIndex % cellCountPerLine;
+
+                var probeCountPerCell = cellIndex *
+                                        probeCountPerCellAxis * probeCountPerCellAxis * probeCountPerCellAxis;
+                var dataBaseIndexL0L1 = probeCountPerCell * 3;
+                var dataBaseIndexL2 = probeCountPerCell * 4;
+                
+                var probeCountPerSlice = probeCountPerVolumeAxis.x * probeCountPerVolumeAxis.y;
+                var probeBaseIndex = sliceIndex * (probeCountPerCellAxis - 1) * probeCountPerSlice
+                                     + rowIndex * (probeCountPerCellAxis - 1) * probeCountPerVolumeAxis.x 
+                                     + columnIndex * (probeCountPerCellAxis - 1);
+                
+                for (int probeSliceIndex = 0; probeSliceIndex < probeCountPerCellAxis; ++probeSliceIndex)
+                {
+                    for (int probeRowIndex = 0; probeRowIndex < probeCountPerCellAxis; ++probeRowIndex)
+                    {
+                        for (int probeColumnIndex = 0; probeColumnIndex < probeCountPerCellAxis; ++probeColumnIndex)
+                        {
+                            var probeIndex = probeBaseIndex + probeSliceIndex * probeCountPerSlice
+                                                            + probeRowIndex * probeCountPerVolumeAxis.x
+                                                            + probeColumnIndex;
+                            
+                            
+                            l0l1PerCell[dataBaseIndexL0L1] = shAr[probeIndex];
+                            l0l1PerCell[dataBaseIndexL0L1 + 1] = shAg[probeIndex];
+                            l0l1PerCell[dataBaseIndexL0L1 + 2] = shAb[probeIndex];
+                            
+                            l2PerCell[dataBaseIndexL2] = shBr[probeIndex];
+                            l2PerCell[dataBaseIndexL2 + 1] = shBg[probeIndex];
+                            l2PerCell[dataBaseIndexL2 + 2] = shBb[probeIndex];
+                            l2PerCell[dataBaseIndexL2 + 3] = shC[probeIndex];
+                        }
+                    }
+                }
+            }
         }
         
+        public static JobHandle FlattenDataToPerCellData(
+            int probeCountPerCellAxis, Vector3Int probeCountPerVolumeAxis, 
+            NativeArray<half4> shAr, 
+            NativeArray<half4> shAg, 
+            NativeArray<half4> shAb, 
+            NativeArray<half4> shBr, 
+            NativeArray<half4> shBg, 
+            NativeArray<half4> shBb, 
+            NativeArray<half4> shC,
+            NativeArray<half4> l0l1PerCell,
+            NativeArray<half4> l2PerCell,
+            int cellCount,
+            Vector3Int cellCountPerAxis
+        )
+        {
+            FattenDataToPerCellDataJob job = new FattenDataToPerCellDataJob()
+            { 
+                probeCountPerCellAxis =  probeCountPerCellAxis,
+                probeCountPerVolumeAxis = probeCountPerVolumeAxis,
+                shAr = shAr,
+                shAg = shAg,
+                shAb = shAb,
+                shBr = shBr,
+                shBg = shBg,
+                shBb = shBb,
+                shC = shC,
+                l0l1PerCell = l0l1PerCell,
+                l2PerCell = l2PerCell,
+                cellCountPerSlice = cellCountPerAxis.x * cellCountPerAxis.y,
+                cellCountPerLine = cellCountPerAxis.x
+            };
+
+            return job.Schedule(cellCount, 64);
+        }
     }
 }

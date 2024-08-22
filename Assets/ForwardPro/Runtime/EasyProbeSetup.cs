@@ -34,7 +34,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             public SHBand band;
             public MemoryBudget budget;
             public bool enableStreaming;
-            
+            public ComputeShader uploadShader;
+            public DataStorageType dataStorageType;
 #if UNITY_EDITOR
             public BytesLoader.LoaderType loaderType;
             [HideInInspector]
@@ -67,13 +68,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 switch (settings.budget)
                 {
                     case MemoryBudget.Low:
-                        EasyProbeStreaming.UpdateCellStreaming(context, ref renderingData, settings, k_BoundingRadiusLow);
+                        EasyProbeStreaming.UpdateCellStreaming(context, ref renderingData, k_BoundingRadiusLow);
                         break;
                     case MemoryBudget.Medium:
-                        EasyProbeStreaming.UpdateCellStreaming(context, ref renderingData, settings, k_BoundingRadiusMedium);
+                        EasyProbeStreaming.UpdateCellStreaming(context, ref renderingData, k_BoundingRadiusMedium);
                         break;
                     case MemoryBudget.High:
-                        EasyProbeStreaming.UpdateCellStreaming(context, ref renderingData, settings, k_BoundingRadiusHigh);
+                        EasyProbeStreaming.UpdateCellStreaming(context, ref renderingData, k_BoundingRadiusHigh);
                         break;
                 }
             }

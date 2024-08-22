@@ -1,0 +1,20 @@
+
+#pragma kernel Upload
+
+RWTexture2D<half4> _EasyProbeSHAr;
+RWTexture2D<half4> _EasyProbeSHAg;
+RWTexture2D<half4> _EasyProbeSHAb;
+
+#if USE_SH_BAND_L2
+RWTexture2D<half4> _EasyProbeSHBr;
+RWTexture2D<half4> _EasyProbeSHBg;
+RWTexture2D<half4> _EasyProbeSHbb;
+RWTexture2D<half4> _EasyProbeSHC;
+#endif
+
+
+[numthreads(8,8,1)]
+void Upload (uint3 id : SV_DispatchThreadID)
+{
+   
+}

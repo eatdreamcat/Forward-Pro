@@ -37,6 +37,9 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         private static NativeArray<half4> s_SHBg; 
         private static NativeArray<half4> s_SHBb; 
         private static NativeArray<half4> s_SHC;
+
+        private static NativeArray<half4> s_L0L1PerCell;
+        private static NativeArray<half4> s_L2PerCell;
         
         public static void PlaceProbes()
         {
@@ -167,7 +170,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 combineHandle.Complete();
             }
 
-            if (EasyProbeStreaming.s_DataStorageType == DataStorageType.Flatten)
+            if (EasyProbeSetup.Instance.settings.dataStorageType == DataStorageType.Flatten)
             {
                 WriteOutputFlatten();
             }
@@ -176,7 +179,7 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 WriteOutputPerCell();
             }
             
-            EasyProbeStreaming.Dispose();
+            Dispose();
         }
 
         static void SortByWorldPositionXYZ()
@@ -293,7 +296,58 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         static void WriteOutputPerCell()
         {
             PrepareForOutputWriting(out var probeCountPerAxis, out var cellMin, out var cellMax);
+
+            WriteMetadata(probeCountPerAxis, cellMin, cellMax);
             
+            var probeCountPerCellAxis = s_ProbeCellSize / s_ProbeSpacing + 1;
+            var probeCount = probeCountPerCellAxis * probeCountPerCellAxis * probeCountPerCellAxis;
+            
+            if (s_L0L1PerCell.IsCreated) s_L0L1PerCell.Dispose();
+            s_L0L1PerCell = new NativeArray<half4>(s_ProbeCells.Count * 3 * probeCount, Allocator.Persistent,
+                NativeArrayOptions.UninitializedMemory);
+            
+            if (s_L2PerCell.IsCreated) s_L2PerCell.Dispose();
+            s_L2PerCell = new NativeArray<half4>(s_ProbeCells.Count * 4 * probeCount, Allocator.Persistent,
+                NativeArrayOptions.UninitializedMemory);
+
+            var cellCountPerAxis = (cellMax - cellMin) / s_ProbeCellSize;
+            var jobHandle = EasyProbeBakingJob.FlattenDataToPerCellData(
+                probeCountPerCellAxis,
+                new Vector3Int(
+                    (int)probeCountPerAxis.x, 
+                    (int)probeCountPerAxis.y, 
+                    (int)probeCountPerAxis.z),
+                s_SHAr,
+                s_SHAg,
+                s_SHAb,
+                s_SHBr,
+                s_SHBg,
+                s_SHBb,
+                s_SHC,
+                s_L0L1PerCell,
+                s_L2PerCell,
+                s_ProbeCells.Count,
+                cellCountPerAxis
+            );
+            jobHandle.Complete();
+
+            {
+                var l0l1ByteSlice = s_L0L1PerCell.Slice(0, s_L0L1PerCell.Length).SliceConvert<byte>();
+                var bytesToWrite = new byte[l0l1ByteSlice.Length];
+                l0l1ByteSlice.CopyTo(bytesToWrite);
+                string path = s_CurrentOutputRoot + EasyProbeStreaming.s_L0L1DataPath;
+                File.WriteAllBytes(path, bytesToWrite);
+                Debug.Log("[EasyProbeBaking](WriteBytes): l0l1 data written to " + path);
+            }
+
+            {
+                var l2ByteSlice = s_L2PerCell.Slice(0, s_L2PerCell.Length).SliceConvert<byte>();
+                var bytesToWrite = new byte[l2ByteSlice.Length];
+                l2ByteSlice.CopyTo(bytesToWrite);
+                string path = s_CurrentOutputRoot + EasyProbeStreaming.s_L2DataPath;
+                File.WriteAllBytes(path, bytesToWrite);
+                Debug.Log("[EasyProbeBaking](WriteBytes): l2 data written to " + path);
+            }
         }
         
         static void WriteOutputFlatten()
@@ -343,8 +397,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
             return byteArray;
         }
-        
-        static void WriteBytesFlatten(Vector3 probeCountPerAxis, Vector3Int cellMin, Vector3Int cellMax)
+
+        static void WriteMetadata(Vector3 probeCountPerAxis, Vector3Int cellMin, Vector3Int cellMax)
         {
             var probeCountPerCellAxis = s_ProbeCellSize / s_ProbeSpacing + 1;
             // metadata
@@ -366,6 +420,11 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 Debug.Log("[EasyProbeBaking](WriteBytes): meta data written to " + path);
                 
             }
+        }
+        static void WriteBytesFlatten(Vector3 probeCountPerAxis, Vector3Int cellMin, Vector3Int cellMax)
+        {
+            
+            WriteMetadata(probeCountPerAxis, cellMin, cellMax);
 
             int totalProbeCount = (int)(probeCountPerAxis.x * probeCountPerAxis.y * probeCountPerAxis.z);
             
@@ -456,7 +515,10 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 File.WriteAllBytes(path, bytesToWrite);
                 Debug.Log("[EasyProbeBaking](WriteBytes): cell data written to " + path);
             }
+        }
 
+        static void Dispose()
+        {
             if (s_ProbeCoefficientsFlatten.IsCreated) s_ProbeCoefficientsFlatten.Dispose();
             if (s_ProbeCoefficients.IsCreated) s_ProbeCoefficients.Dispose();
             if (s_ProbeAttenFlatten.IsCreated) s_ProbeAttenFlatten.Dispose();
@@ -471,10 +533,15 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             if (s_SHBg.IsCreated) s_SHBg.Dispose();
             if (s_SHBb.IsCreated) s_SHBb.Dispose();
             if (s_SHC.IsCreated) s_SHC.Dispose();
+
+            if (s_L0L1PerCell.IsCreated) s_L0L1PerCell.Dispose();
+            if (s_L2PerCell.IsCreated) s_L2PerCell.Dispose();
+            
+            EasyProbeStreaming.Dispose();
             
             AssetDatabase.Refresh();
         }
-
+        
         static bool PrepareBaking()
         {
             PlaceProbes();

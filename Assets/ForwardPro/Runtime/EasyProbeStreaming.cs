@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Profiling;
@@ -112,11 +113,17 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         private static byte[] s_SHBb;
         private static byte[] s_SHC;
 
+        private static byte[] s_L0L1Bytes;
+        private static byte[] s_L2Bytes;
+
+        private static half4[] s_L0L1Half4;
+        private static half4[] s_L2Half4;
+        private static ComputeBuffer s_L0L1Buffer;
+        private static ComputeBuffer s_L2Buffer;
+
         public static EasyProbeMetaData s_Metadata;
         public static List<EasyCellData> s_CellDatas = new List<EasyCellData>();
         private static bool s_NeedReloadMetadata = true;
-
-        public static DataStorageType s_DataStorageType;
         
         public static void SetMetadataDirty()
         {
@@ -141,16 +148,24 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         private static List<ProbeStreamingRequest> s_SHBbRequests = new();
         private static List<ProbeStreamingRequest> s_SHCRequests = new();
         
-        private static bool s_EnableStreaming = false;
-            
         private static EasyProbeSetup.MemoryBudget s_Budget;
         private static ProbeVolumeSHBands s_Bands;
         
         private const int k_BytesPerHalf4 = 8;
         private static byte[] s_MetadataBuffer;
-        
-        static bool AllocBufferDataIfNeeded(ref Texture probeRT, ref byte[] sh,
-            int width, int height, int depth, string name, bool allocRenderTexture = false)
+
+        struct MarshalBufferHandle
+        {
+            public bool hasAlloc;
+            public int size;
+            public IntPtr pointer;
+        }
+
+        private static MarshalBufferHandle s_MetadataMarshalHandle;
+        private static MarshalBufferHandle s_ByteToHalf4HandleL0L1;
+        private static MarshalBufferHandle s_ByteToHalf4HandleL2;
+
+        static bool AllocTextureIfNeeded(ref Texture probeRT, int width, int height, int depth, string name, bool allocRenderTexture = false)
         {
             bool hasAlloc = false;
             
@@ -164,12 +179,29 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 hasAlloc = true;
             }
 
-            var totalLength = width * height * depth * k_BytesPerHalf4;
-            if (sh == null || sh.Length != totalLength)
+            return hasAlloc;
+        }
+
+        static bool AllocArrayBufferIfNeeded<T>(ref T[] sh,
+            int bufferSize) where T : struct
+        { 
+           
+            if (sh == null || sh.Length != bufferSize)
             {
-                sh = new byte[totalLength];
-                hasAlloc = true;
+                sh = new T[bufferSize];
+                return true;
             }
+
+            return false;
+        }
+
+        static bool AllocBufferDataIfNeeded(ref Texture probeRT, ref byte[] sh,
+            int width, int height, int depth, string name, bool allocRenderTexture = false)
+        {
+            bool hasAlloc = AllocTextureIfNeeded(ref probeRT, width, height, depth, name, allocRenderTexture);
+            
+            var totalLength = width * height * depth * k_BytesPerHalf4;
+            hasAlloc |= AllocArrayBufferIfNeeded(ref sh, totalLength);
             
             return hasAlloc;
         }
@@ -245,60 +277,6 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             return true;
         }
         
-        public static bool ReadBytesFromRelativePath(FileStream fs, ref byte[] buffer, int bufferOffset, long fileOffset, int length, out int readBytes)
-        {
-            readBytes = 0;
-            
-            if (length <= 0)
-            {
-                Debug.LogError("[EasyProbeStreaming](ReadBytesFromRelativePath): bytes to read is zero.");
-                return false;
-            }
-            
-           
-            if (buffer.Length - bufferOffset < length)
-            {
-                Debug.LogError("[EasyProbeStreaming](ReadBytesFromRelativePath): buffer is lack of size.");
-                return false;
-            }
-            
-            try
-            {
-#if UNITY_EDITOR || ENABLE_PROFILER
-                Profiler.BeginSample(ProfilerSampler.s_BytesStreamRead);
-#endif
-                
-#if UNITY_EDITOR || ENABLE_PROFILER
-                Profiler.BeginSample(ProfilerSampler.s_FileStreamSeek);
-#endif
-                fs.Seek(fileOffset, SeekOrigin.Begin);
-                
-#if UNITY_EDITOR || ENABLE_PROFILER
-                Profiler.EndSample();
-#endif
-                
-#if UNITY_EDITOR || ENABLE_PROFILER
-                Profiler.BeginSample(ProfilerSampler.s_FileStreamRead);
-#endif
-                readBytes = fs.Read(buffer, bufferOffset, length);
-                
-#if UNITY_EDITOR || ENABLE_PROFILER
-                Profiler.EndSample();
-#endif
-#if UNITY_EDITOR || ENABLE_PROFILER
-                Profiler.EndSample();
-#endif
-                
-                return true;
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("[EasyProbeStreaming](ReadByteFromRelativePath):" + e.Message);
-            }
-
-            return false;
-        }
-        
         public static bool LoadMetadata(ref EasyProbeMetaData metaData, string volumeHash = "")
         {
             
@@ -314,28 +292,24 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 return false;
             }
 
-            IntPtr ptr = Marshal.AllocHGlobal(size);
+           AllocMarshalHandleIfNeeded(ref s_MetadataMarshalHandle, size);
+            
             bool isSuccess = false;
             try
             {
-                Marshal.Copy(s_MetadataBuffer, 0, ptr, size);
-                metaData = Marshal.PtrToStructure<EasyProbeMetaData>(ptr);
+                Marshal.Copy(s_MetadataBuffer, 0, s_MetadataMarshalHandle.pointer, size);
+                metaData = Marshal.PtrToStructure<EasyProbeMetaData>(s_MetadataMarshalHandle.pointer);
                 isSuccess = true;
             }
             catch (Exception e)
             {
                 Debug.LogError($"[EasyProbeStreaming](LoadMetadata): {e.Message}");
             }
-            finally
-            {
-                Marshal.FreeHGlobal(ptr);
-            }
-
+            
             return isSuccess;
         }
         
-        public static void UpdateCellStreaming(ScriptableRenderContext context, ref RenderingData renderingData, 
-            EasyProbeSetup.EasyProbeSettings settings, float radius)
+        public static void UpdateCellStreaming(ScriptableRenderContext context, ref RenderingData renderingData, float radius)
         {
             if (s_NeedReloadMetadata)
             {
@@ -392,8 +366,13 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             }
             return true;
         }
-        
-        static bool DoStreaming(Camera camera, float radius)
+
+        static bool DoStreamingPerCell(Camera camera, float radius)
+        {
+            return false;
+        }
+
+        static bool DoStreamingFlatten(Camera camera, float radius)
         {
 #if UNITY_EDITOR || ENABLE_PROFILER
             Profiler.BeginSample(ProfilerSampler.s_DoStreaming);
@@ -508,16 +487,19 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 width, height, depth, s_EasyProbeSHAgName);
             AllocBufferDataIfNeeded(ref s_EasyProbeSHAb, ref s_SHAb,
                 width, height, depth, s_EasyProbeSHAbName);
+
+            if (EasyProbeSetup.Instance.settings.band == EasyProbeSetup.SHBand.L2)
+            {
+                AllocBufferDataIfNeeded(ref s_EasyProbeSHBr, ref s_SHBr,
+                    width, height, depth, s_EasyProbeSHBrName);
+                AllocBufferDataIfNeeded(ref s_EasyProbeSHBg, ref s_SHBg,
+                    width, height, depth, s_EasyProbeSHBgName);
+                AllocBufferDataIfNeeded(ref s_EasyProbeSHBb, ref s_SHBb,
+                    width, height, depth, s_EasyProbeSHBbName);
             
-            AllocBufferDataIfNeeded(ref s_EasyProbeSHBr, ref s_SHBr,
-                width, height, depth, s_EasyProbeSHBrName);
-            AllocBufferDataIfNeeded(ref s_EasyProbeSHBg, ref s_SHBg,
-                width, height, depth, s_EasyProbeSHBgName);
-            AllocBufferDataIfNeeded(ref s_EasyProbeSHBb, ref s_SHBb,
-                width, height, depth, s_EasyProbeSHBbName);
-            
-            AllocBufferDataIfNeeded(ref s_EasyProbeSHC, ref s_SHC,
-                width, height, depth, s_EasyProbeSHCName);
+                AllocBufferDataIfNeeded(ref s_EasyProbeSHC, ref s_SHC,
+                    width, height, depth, s_EasyProbeSHCName);
+            }
 
             #endregion
             
@@ -566,29 +548,120 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         }
 
 
-        static bool LoadInOnce()
+        static void InitVolumeConstantLoadInOnce()
         {
-          
             var cellMin = s_Metadata.cellMin;
             var cellMax = s_Metadata.cellMax;
-            var probeSpacing = s_Metadata.probeSpacing;
-            var halfSize = probeSpacing / 2.0f;
-
-            var globalProbeCountInTotal = s_Metadata.probeCountPerVolumeAxis.x * s_Metadata.probeCountPerVolumeAxis.y *
-                                          s_Metadata.probeCountPerVolumeAxis.z;
+            var halfSize = s_Metadata.probeSpacing / 2.0f;
+            
             s_ProbeVolumeWorldOffset = 
                 new Vector4(cellMin.x - halfSize, cellMin.y - halfSize, cellMin.z - halfSize, 1.0f);
             s_ProbeVolumeSize = cellMax - cellMin;
             s_ProbeVolumeSize += new Vector3(
-                probeSpacing,
-                probeSpacing,
-                probeSpacing
+                s_Metadata.probeSpacing,
+                s_Metadata.probeSpacing,
+                s_Metadata.probeSpacing
             );
+        }
+        
+        static bool LoadInOncePerCell()
+        {
+            InitVolumeConstantLoadInOnce();
             
-            var probeCountPerAxie = s_ProbeVolumeSize / probeSpacing;
-            var width = (int)probeCountPerAxie.x;
-            var height = (int)probeCountPerAxie.y;
-            var depth = (int)probeCountPerAxie.z;
+            var cellCountPerAxis = (s_Metadata.cellMax - s_Metadata.cellMin) / s_Metadata.cellSize;
+            var totalCellCount = cellCountPerAxis.x * cellCountPerAxis.y * cellCountPerAxis.z;
+            var probeCountPerCell = s_Metadata.probeCountPerCellAxis * 
+                                    s_Metadata.probeCountPerCellAxis * s_Metadata.probeCountPerCellAxis;
+            var probeCountPerAxis = s_ProbeVolumeSize / s_Metadata.probeSpacing;
+            
+            var rtWidth = (int)probeCountPerAxis.x;
+            var rtHeight = (int)probeCountPerAxis.y;
+            var rtDepth = (int)probeCountPerAxis.z;
+            
+            var hasAlloc = false;
+            
+            hasAlloc |= AllocTextureIfNeeded(ref s_EasyProbeSHAr,
+                rtWidth, rtHeight, rtDepth, s_EasyProbeSHArName);
+            hasAlloc |= AllocTextureIfNeeded(ref s_EasyProbeSHAg,
+                rtWidth, rtHeight, rtDepth, s_EasyProbeSHAgName);
+            hasAlloc |= AllocTextureIfNeeded(ref s_EasyProbeSHAb,
+                rtWidth, rtHeight, rtDepth, s_EasyProbeSHAbName);
+
+            
+            var bufferSizeL0L1 = totalCellCount * probeCountPerCell * k_BytesPerHalf4 * 3;
+            var bufferSizeL2 = totalCellCount * probeCountPerCell * k_BytesPerHalf4 * 4;
+            
+            hasAlloc |= AllocArrayBufferIfNeeded(ref s_L0L1Bytes, bufferSizeL0L1);
+            
+            if (EasyProbeSetup.Instance.settings.band == EasyProbeSetup.SHBand.L2)
+            {
+                hasAlloc |= AllocTextureIfNeeded(ref s_EasyProbeSHBr,
+                    rtWidth, rtHeight, rtDepth, s_EasyProbeSHBrName);
+                hasAlloc |= AllocTextureIfNeeded(ref s_EasyProbeSHBg,
+                    rtWidth, rtHeight, rtDepth, s_EasyProbeSHBgName);
+                hasAlloc |= AllocTextureIfNeeded(ref s_EasyProbeSHBb,
+                    rtWidth, rtHeight, rtDepth, s_EasyProbeSHBbName);
+            
+                hasAlloc |= AllocTextureIfNeeded(ref s_EasyProbeSHC,
+                    rtWidth, rtHeight, rtDepth, s_EasyProbeSHCName);
+                
+                
+                hasAlloc |= AllocArrayBufferIfNeeded(ref s_L2Bytes, bufferSizeL2);
+            }
+            
+            if (hasAlloc)
+            {
+                var currentScenePath = SceneManagement.SceneManager.GetActiveScene().path;
+                var lastIndexOfSep = currentScenePath.LastIndexOf("/");
+                currentScenePath = currentScenePath.Substring(0, lastIndexOfSep);
+
+                // L0L1
+                var filePath = currentScenePath + s_L0L1DataPath;
+                if (!LoadSHBytes(filePath, new List<ProbeStreamingRequest>()
+                    {
+                        new ProbeStreamingRequest()
+                        {
+                            bufferOffset = 0,
+                            fileOffset = 0,
+                            length = bufferSizeL0L1
+                        }
+                    }, ref s_L0L1Bytes, out var bytesL0L1))
+                {
+                    Debug.LogError("[EasyProbeStreaming](ProcessStreaming): failed to load L0L1 data.");
+                    return false;
+                }
+                
+                if (EasyProbeSetup.Instance.settings.band == EasyProbeSetup.SHBand.L2)
+                {
+                    // L2
+                    filePath = currentScenePath + s_L2DataPath;
+                    if (!LoadSHBytes(filePath, new List<ProbeStreamingRequest>()
+                        {
+                            new ProbeStreamingRequest()
+                            {
+                                bufferOffset = 0,
+                                fileOffset = 0,
+                                length = bufferSizeL2
+                            }
+                        }, ref s_L2Bytes, out var bytesL2))
+                    {
+                        Debug.LogError("[EasyProbeStreaming](ProcessStreaming): failed to load L2 data.");
+                        return false;
+                    }
+                }
+            }
+            
+            return true;
+        }
+        
+        static bool LoadInOnceFlatten()
+        {
+            InitVolumeConstantLoadInOnce();
+            
+            var probeCountPerAxis = s_ProbeVolumeSize / s_Metadata.probeSpacing;
+            var width = (int)probeCountPerAxis.x;
+            var height = (int)probeCountPerAxis.y;
+            var depth = (int)probeCountPerAxis.z;
             
             var hasAlloc = false;
             
@@ -598,19 +671,25 @@ namespace UnityEngine.Rendering.EasyProbeVolume
                 width, height, depth, s_EasyProbeSHAgName);
             hasAlloc |= AllocBufferDataIfNeeded(ref s_EasyProbeSHAb, ref s_SHAb,
                 width, height, depth, s_EasyProbeSHAbName);
+
+            if (EasyProbeSetup.Instance.settings.band == EasyProbeSetup.SHBand.L2)
+            {
+                hasAlloc |= AllocBufferDataIfNeeded(ref s_EasyProbeSHBr, ref s_SHBr,
+                    width, height, depth, s_EasyProbeSHBrName);
+                hasAlloc |= AllocBufferDataIfNeeded(ref s_EasyProbeSHBg, ref s_SHBg,
+                    width, height, depth, s_EasyProbeSHBgName);
+                hasAlloc |= AllocBufferDataIfNeeded(ref s_EasyProbeSHBb, ref s_SHBb,
+                    width, height, depth, s_EasyProbeSHBbName);
             
-            hasAlloc |= AllocBufferDataIfNeeded(ref s_EasyProbeSHBr, ref s_SHBr,
-                width, height, depth, s_EasyProbeSHBrName);
-            hasAlloc |= AllocBufferDataIfNeeded(ref s_EasyProbeSHBg, ref s_SHBg,
-                width, height, depth, s_EasyProbeSHBgName);
-            hasAlloc |= AllocBufferDataIfNeeded(ref s_EasyProbeSHBb, ref s_SHBb,
-                width, height, depth, s_EasyProbeSHBbName);
-            
-            hasAlloc |= AllocBufferDataIfNeeded(ref s_EasyProbeSHC, ref s_SHC,
-                width, height, depth, s_EasyProbeSHCName);
+                hasAlloc |= AllocBufferDataIfNeeded(ref s_EasyProbeSHC, ref s_SHC,
+                    width, height, depth, s_EasyProbeSHCName);
+            }
             
             if (hasAlloc)
             {
+                var globalProbeCountInTotal = s_Metadata.probeCountPerVolumeAxis.x * s_Metadata.probeCountPerVolumeAxis.y *
+                                              s_Metadata.probeCountPerVolumeAxis.z;
+                
                 var totalProbeCountToLoad = width * height * depth;
                 var bytesToLoad = totalProbeCountToLoad * k_BytesPerHalf4;
                 var fileOffsetPerComponent = globalProbeCountInTotal * k_BytesPerHalf4;
@@ -753,21 +832,38 @@ namespace UnityEngine.Rendering.EasyProbeVolume
             
             if (EasyProbeSetup.Instance != null)
             {
-                if (s_EnableStreaming != EasyProbeSetup.Instance.settings.enableStreaming)
-                {
-                    s_EnableStreaming = EasyProbeSetup.Instance.settings.enableStreaming;
-                    
-                }
-
-                ResetShaderConstants();
+                var enableStreaming = EasyProbeSetup.Instance.settings.enableStreaming;
                 
-                if (s_EnableStreaming)
+                ResetShaderConstants();
+
+                var dataType = EasyProbeSetup.Instance.settings.dataStorageType;
+                
+                if (dataType == DataStorageType.Flatten)
                 {
-                    return DoStreaming(camera, radius);
+                    if (enableStreaming)
+                    {
+                        return DoStreamingFlatten(camera, radius);
+                    }
+                   
+                    {
+                        return LoadInOnceFlatten();
+                    }    
                 }
-                else
+               
                 {
-                    return LoadInOnce();
+                    if (EasyProbeSetup.Instance.settings.uploadShader == null)
+                    {
+                        return false;
+                    }
+                    
+                    if (enableStreaming)
+                    {
+                        return DoStreamingPerCell(camera, radius);
+                    }
+                 
+                    {
+                        return LoadInOncePerCell();
+                    }    
                 }
             }
 
@@ -889,6 +985,79 @@ namespace UnityEngine.Rendering.EasyProbeVolume
         
         public static void UploadTextureData()
         {
+            var dataType = EasyProbeSetup.Instance.settings.dataStorageType;
+            if (dataType == DataStorageType.Flatten)
+            {
+                UploadTextureDataFlatten();
+            }
+            else
+            {
+                UploadTextureDataPerCell();
+            }
+        }
+
+        static void AllocMarshalHandleIfNeeded(ref MarshalBufferHandle handle, int desireSize)
+        {
+            if (!handle.hasAlloc || handle.size != desireSize)
+            {
+                if (handle.hasAlloc)
+                {
+                    Marshal.FreeHGlobal(handle.pointer);
+                }
+                
+                handle.pointer = Marshal.AllocHGlobal(desireSize);
+                handle.hasAlloc = true;
+                handle.size = desireSize;
+            }
+        }
+
+        static void ArrayTypeConvert<T1, T2>(ref T1[] source, ref T2[] destination) where T1 : struct where T2 : struct
+        {
+            GCHandle sourceHandle = GCHandle.Alloc(source, GCHandleType.Pinned);
+            GCHandle destHandle = GCHandle.Alloc(destination, GCHandleType.Pinned);
+            try
+            {
+                unsafe
+                {
+                    void* srcPointer = (void*)sourceHandle.AddrOfPinnedObject();
+                    void* destPointer = (void*)destHandle.AddrOfPinnedObject();
+
+                    UnsafeUtility.MemCpy(destPointer, srcPointer, source.Length);
+                }
+            }
+            finally
+            {
+                destHandle.Free();
+                sourceHandle.Free();
+            }
+        }
+        
+        
+        static void UploadTextureDataPerCell()
+        {
+            var uploadShader = EasyProbeSetup.Instance.settings.uploadShader;
+
+            AllocMarshalHandleIfNeeded(ref s_ByteToHalf4HandleL0L1, s_L0L1Bytes.Length);
+            AllocArrayBufferIfNeeded(ref s_L0L1Half4, s_L0L1Bytes.Length / k_BytesPerHalf4);
+
+            ArrayTypeConvert(ref s_L0L1Bytes, ref s_L0L1Half4);
+            // TODO: upload multiples batches or use a big temp RT
+            // s_L0L1Buffer = new ComputeBuffer()
+            // uploadShader.SetBuffer();
+            
+            if (EasyProbeSetup.Instance.settings.band == EasyProbeSetup.SHBand.L2)
+            {
+                uploadShader.EnableKeyword(s_USE_SH_BAND_L2);
+                
+                AllocMarshalHandleIfNeeded(ref s_ByteToHalf4HandleL2, s_L2Bytes.Length);
+                AllocArrayBufferIfNeeded(ref s_L2Half4, s_L2Bytes.Length / k_BytesPerHalf4);
+
+                ArrayTypeConvert(ref s_L2Bytes, ref s_L2Half4);
+            }
+        }
+        
+        static void UploadTextureDataFlatten()
+        {
             UpdateDataLocationTexture(s_EasyProbeSHAr, s_SHAr);
             UpdateDataLocationTexture(s_EasyProbeSHAg, s_SHAg);
             UpdateDataLocationTexture(s_EasyProbeSHAb, s_SHAb);
@@ -965,7 +1134,34 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
             s_SHC = null;
 
+            s_L0L1Bytes = null;
+            s_L2Bytes = null;
+
             s_NeedReloadMetadata = true;
+
+            if (s_MetadataMarshalHandle.hasAlloc)
+            {
+                Marshal.FreeHGlobal(s_MetadataMarshalHandle.pointer);
+            }
+
+            s_MetadataMarshalHandle.hasAlloc = false;
+            s_MetadataMarshalHandle.size = 0;
+
+            if (s_ByteToHalf4HandleL0L1.hasAlloc)
+            {
+                Marshal.FreeHGlobal(s_ByteToHalf4HandleL0L1.pointer);
+            }
+
+            s_ByteToHalf4HandleL0L1.hasAlloc = false;
+            s_ByteToHalf4HandleL0L1.size = 0;
+            
+            if (s_ByteToHalf4HandleL2.hasAlloc)
+            {
+                Marshal.FreeHGlobal(s_ByteToHalf4HandleL2.pointer);
+            }
+
+            s_ByteToHalf4HandleL2.hasAlloc = false;
+            s_ByteToHalf4HandleL2.size = 0;
 
             BytesLoader.Dispose();
             

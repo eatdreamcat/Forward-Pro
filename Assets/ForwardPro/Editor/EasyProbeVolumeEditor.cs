@@ -303,8 +303,8 @@ namespace UnityEngine.Rendering.EasyProbeVolume
 
             // m_SampleDirDensity = (SampleDirDensity)EditorGUILayout.EnumPopup(Styles.s_SampleDirDensity, m_SampleDirDensity);
             m_SampleCount = (SampleCount)EditorGUILayout.EnumPopup(Styles.s_SampleCount, m_SampleCount);
-            EasyProbeStreaming.s_DataStorageType = (DataStorageType)EditorGUILayout.EnumPopup(Styles.s_DataStorageType,
-                EasyProbeStreaming.s_DataStorageType
+            EasyProbeSetup.Instance.settings.dataStorageType = (DataStorageType)EditorGUILayout.EnumPopup(Styles.s_DataStorageType,
+                EasyProbeSetup.Instance.settings.dataStorageType
                 );
             s_RandomLightColor = EditorGUILayout.Toggle(Styles.s_RandomLightColor, s_RandomLightColor);
             EditorGUILayout.Space();

@@ -30,7 +30,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <NoWarn>0169,0649</NoWarn>
-    <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
   </PropertyGroup>
   <PropertyGroup>
@@ -90,6 +90,7 @@
     <None Include="Packages\com.unity.render-pipelines.universal@14.0.9\ValidationExceptions.json" />
     <None Include="Assets\ForwardPro\Samples\Garden\Shaders\GravelsPixelDepthOffset_Shader.shader" />
     <None Include="Assets\SharedAssets\TextMeshPro\Resources\LineBreaking_Following_Characters.txt" />
+    <None Include="Assets\ForwardPro\Runtime\EasyProbeUpload.compute" />
     <None Include="Assets\SharedAssets\Shaders\HLSL\StencilOnly.shader" />
     <None Include="Assets\SharedAssets\TextMeshPro\Shaders\TMP_SDF-Mobile-Masking.shader" />
     <None Include="Assets\SharedAssets\TextMeshPro\Shaders\TMP_SDF-Overlay.shader" />

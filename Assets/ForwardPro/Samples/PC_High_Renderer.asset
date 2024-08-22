@@ -132,6 +132,8 @@ MonoBehaviour:
     band: 1
     budget: 2
     enableStreaming: 0
+    uploadShader: {fileID: 7200000, guid: 6b82841d45c768a4697772fe9d201aa5, type: 3}
+    dataStorageType: 1
     loaderType: 0
     sceneViewStreamingWithCustomBox: 1
     streamingBounds:
